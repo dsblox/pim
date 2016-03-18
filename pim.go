@@ -4,6 +4,13 @@ import "fmt"
 import "bufio"
 import "os"
 import "strings"
+import "database/sql"
+import "log"
+
+// global variable to hold a DB connection
+type Env struct {
+    db *sql.DB
+}
 
 type PimCmd int
 const (
@@ -76,6 +83,65 @@ func moveDown(oldCurrentTask *Task) *Task {
 	return newCurrentTask
 }
 
+func dbExec(env *Env, sqlStr string, args ...interface{}) (sql.Result, error) {
+	result, err := env.db.Exec(sqlStr, args...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return result, err
+}
+
+// returns id of inserted row if no error
+func dbInsert(env *Env, sqlStr string, args ...interface{}) (int, error) {
+	var id int
+	err := env.db.QueryRow(sqlStr, args...).Scan(&id)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return id, err
+}
+
+// note the weirdness that we want the app - not the database
+// to hold the top-level grouping-task, so bTop used only at
+// the first level can be used to not save the first task.
+func saveTask(env *Env, t *Task, parentId int, bTop bool) error {
+
+	var myId int = -1
+	if (!bTop) {
+
+		// save myself - with null parent id if none specified
+		// but save my own id so I can pass it on to my kids
+		var err error
+		if (parentId != -1) {
+			myId, err = dbInsert(env, "INSERT INTO tasks (name, state, parent_id) VALUES ($1, $2, $3)", t.name, t.state, parentId)
+		} else {
+			myId, err = dbInsert(env, "INSERT INTO tasks (name, state, parent_id) VALUES ($1, $2, NULL)", t.name, t.state)
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	}
+
+	// save my children
+	for curr := t.FirstChild(); curr != nil; curr = curr.NextSibling() {
+		err := saveTask(env, curr, myId, false)
+		if err != nil {
+			log.Fatal(err)
+		}		
+	}
+	return nil		
+}
+
+// TBD - find a way to load the tasks - this will probably
+// require that we start to store the task id on the task
+// object.  Probably time to just make the object's
+// persistence some kind of mixin to the Task
+func loadTask(env *Env, t *Task, bTop bool) *Task, error {
+
+	return t, nil
+}
+
 func main() {
     fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
 
@@ -113,6 +179,41 @@ func main() {
     */
 
     var masterTask *Task = &Task{name:"Your Console Task List", state:notStarted}
+
+
+    // initialize the database and hold in global variable env
+    db, err := NewDB("postgres://postgres:postgres@localhost/pim?sslmode=disable")
+    if err != nil {
+        log.Panic(err)
+    }
+    env := &Env{db: db}
+
+    // test DB - see how much data is in task table
+	var (
+		id int
+		name string
+		state TaskState
+	)
+	rows, err := env.db.Query("select id, name, state from tasks")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err := rows.Scan(&id, &name, &state)
+		if err != nil {
+			log.Fatal(err)
+		}
+		t := Task{name:name, state:state}
+		masterTask.AddChild(&t)
+		log.Println(id, name)
+	}
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}    
+
+
     var currentTask *Task = masterTask
     currentTask.current = true
 	printHelp()
@@ -175,4 +276,17 @@ func main() {
 				fmt.Println(masterTask)
 		}
 	}
+
+	// when quitting - clear tasks table and save current tasks
+	/*
+	_, err = env.db.Exec("TRUNCATE TABLE tasks")
+	if err != nil {
+		log.Fatal(err)
+	} */
+	
+	// save my sub-tasks and their sub-tasks
+	err = saveTask(env, masterTask, -1, true)
+	if err != nil {
+		log.Fatal(err)
+	}		
 }
