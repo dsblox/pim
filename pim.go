@@ -4,13 +4,7 @@ import "fmt"
 import "bufio"
 import "os"
 import "strings"
-import "database/sql"
 import "log"
-
-// global variable to hold a DB connection
-type Env struct {
-    db *sql.DB
-}
 
 type PimCmd int
 const (
@@ -28,6 +22,7 @@ const (
 )
 var cmdChars = []rune{ '?', 'q', 'p', 'a', 'x', 'u', 'd', 'c', 's', 'r', 'h'}
 
+// findCommand: given an entered rune will look up the command to execute
 func findCommand(entered rune) int {
 	for i, c := range cmdChars {
 		if entered == c {
@@ -37,6 +32,7 @@ func findCommand(entered rune) int {
 	return help
 }
 
+// printHelp: outputs the help on commands to the console
 func printHelp() {
 	fmt.Println("PIM Console Help")
 	fmt.Println("  p = print task list")
@@ -52,10 +48,12 @@ func printHelp() {
 	fmt.Println("  q = quit")
 }
 
+// moveUp: move the current task up one
 func moveUp(oldCurrentTask *Task) *Task {
-	var newCurrentTask = oldCurrentTask.PrevSibling()
+	var newCurrentTask = oldCurrentTask.PrevSibling(nil)
+	// TBD - go to the deepest children of my previous sibling
 	if newCurrentTask == nil {
-		newCurrentTask = oldCurrentTask.Parent()
+		newCurrentTask = oldCurrentTask.FirstParent()
 	}
 	if newCurrentTask != nil {
 		oldCurrentTask.current = false
@@ -66,14 +64,31 @@ func moveUp(oldCurrentTask *Task) *Task {
 	return newCurrentTask // may be unchanged if at top of list
 }
 
+// moveDown: move the current task down one - note that we maintain
+// the "current" flag on the entire path down the hierarhcy so we
+// can know which parent we care to traverse
 func moveDown(oldCurrentTask *Task) *Task {
+
+	// first try to get the first child of the current task
 	var newCurrentTask = oldCurrentTask.FirstChild()
+
+	// if current task doesn't have any kids
 	if (newCurrentTask == nil) {
-		newCurrentTask = oldCurrentTask.NextSibling()
+
+		// then I need the parent of the current task to find
+		// my next sibling - nill means use "current" parent
+		newCurrentTask = oldCurrentTask.NextSibling(nil)
+
+		// if still nil we need to run the (current) parent chain
+		// and get the next subling of the first parent we find
 		if newCurrentTask == nil && oldCurrentTask.HasParents() {
-			newCurrentTask = oldCurrentTask.Parent().NextSibling()
+			for p := oldCurrentTask.Parent(); p != nil && newCurrentTask == nil; p = p.Parent() {
+				newCurrentTask = p.NextSibling(nil)
+			}
 		}
 	}
+
+	// if we are changing the current task lets reset current flags
 	if newCurrentTask != nil {
 		oldCurrentTask.current = false
 		newCurrentTask.current = true
@@ -83,209 +98,100 @@ func moveDown(oldCurrentTask *Task) *Task {
 	return newCurrentTask
 }
 
-func dbExec(env *Env, sqlStr string, args ...interface{}) (sql.Result, error) {
-	result, err := env.db.Exec(sqlStr, args...)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return result, err
-}
-
-// returns id of inserted row if no error
-func dbInsert(env *Env, sqlStr string, args ...interface{}) (int, error) {
-	var id int
-	err := env.db.QueryRow(sqlStr, args...).Scan(&id)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return id, err
-}
-
-// note the weirdness that we want the app - not the database
-// to hold the top-level grouping-task, so bTop used only at
-// the first level can be used to not save the first task.
-func saveTask(env *Env, t *Task, parentId int, bTop bool) error {
-
-	var myId int = -1
-	if (!bTop) {
-
-		// save myself - with null parent id if none specified
-		// but save my own id so I can pass it on to my kids
-		var err error
-		if (parentId != -1) {
-			myId, err = dbInsert(env, "INSERT INTO tasks (name, state, parent_id) VALUES ($1, $2, $3)", t.name, t.state, parentId)
-		} else {
-			myId, err = dbInsert(env, "INSERT INTO tasks (name, state, parent_id) VALUES ($1, $2, NULL)", t.name, t.state)
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-
-	}
-
-	// save my children
-	for curr := t.FirstChild(); curr != nil; curr = curr.NextSibling() {
-		err := saveTask(env, curr, myId, false)
-		if err != nil {
-			log.Fatal(err)
-		}		
-	}
-	return nil		
-}
-
-// TBD - find a way to load the tasks - this will probably
-// require that we start to store the task id on the task
-// object.  Probably time to just make the object's
-// persistence some kind of mixin to the Task
-func loadTask(env *Env, t *Task, bTop bool) *Task, error {
-
-	return t, nil
-}
-
+// main: for now this is the console app - in the future input args will choose
+// console app vs. web server
 func main() {
     fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
 
-/*
-    t1 := Task{name:"Clean dishes", state:notStarted}
-    t2 := Task{name:"Write program", state:inProgress}
-
-    t3 := Task{name:"Organize for work", state:onHold }
-    t3a := Task{name:"Weekly Planning", state:onHold}
-    t3b := Task{name:"Review Calendar", state:notStarted}
-    t3c := Task{name:"Schedule Robert Catchup", state:notStarted}
-    t3.AddChild(&t3a)
-    t3.AddChild(&t3b)
-    t3.AddChild(&t3c)
-
-    t4 := Task{name:"Have breakfast", state:complete }
-
-    fmt.Printf("\nFirst List...\n")
-    fmt.Println(t1)
-    fmt.Println(t2)
-    fmt.Println(t3)
-    fmt.Println(t4)
-
-    e := t3.RemoveChild(&t3b)
-    if (e != nil) {
-    	fmt.Println(e)
-    }
-    t4.AddChild(&t3b)
-
-    fmt.Printf("\nSecond List...\n")
-    fmt.Println(t1)
-    fmt.Println(t2)
-    fmt.Println(t3)
-    fmt.Println(t4)
-    */
-
+    // dummy master task to hold all tasks - this is for conveniece
+    // and should not be printed out
     var masterTask *Task = &Task{name:"Your Console Task List", state:notStarted}
 
+    // initialize the persistence layer - use PostgreSQL
+    // and assign to masterTask - creating the first data
+    // mapper initializes the DB - I chose to test a data-mapper
+    // pattern to fully abstract the persistence layer from the
+    // task functionality.  This should be the only place the
+    // Tasks know how they are stored.
+    tdm := NewTaskDataMapperPostgreSQL(-1)
+    masterTask.SetDataMapper(tdm)
 
-    // initialize the database and hold in global variable env
-    db, err := NewDB("postgres://postgres:postgres@localhost/pim?sslmode=disable")
-    if err != nil {
-        log.Panic(err)
-    }
-    env := &Env{db: db}
+    // load the task list recursively
+    masterTask.Load()
 
-    // test DB - see how much data is in task table
-	var (
-		id int
-		name string
-		state TaskState
-	)
-	rows, err := env.db.Query("select id, name, state from tasks")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		err := rows.Scan(&id, &name, &state)
-		if err != nil {
-			log.Fatal(err)
-		}
-		t := Task{name:name, state:state}
-		masterTask.AddChild(&t)
-		log.Println(id, name)
-	}
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}    
-
-
+	// keep track of a "cursor" task on which to work
     var currentTask *Task = masterTask
     currentTask.current = true
 	printHelp()
+	fmt.Println(masterTask)
 
-
+	// start the "event loop" based on user input
 	reader := bufio.NewReader(os.Stdin)
-    for cmd := help; cmd != quit;  {
+	var printListAfterCmd bool = true
+    for cmd := printList; cmd != quit;  {
 
+		printListAfterCmd = true
 		fmt.Print("Command: ")
 		text, _ := reader.ReadString('\n')
 		cmd = findCommand(([]rune(text))[0])
 		switch cmd {
 			case help: 
 				printHelp()
+				printListAfterCmd = false
 
 			case printList: 
-				fmt.Println(masterTask)
+				printListAfterCmd = true // happens anyway
 
 			case quit: 
 				fmt.Println("Goodbye!")
+				printListAfterCmd = false
 
 			case upCurrent: 
 				currentTask = moveUp(currentTask)
-				fmt.Println(masterTask)
 
 			case downCurrent: 
 				currentTask = moveDown(currentTask)
-				fmt.Println(masterTask)
 
 			case addTask: 
 				fmt.Print("Enter name of new task: ")
 				taskName, _ := reader.ReadString('\n')
-				currentTask.AddChild(&Task{name:strings.TrimSpace(taskName), state:notStarted})
-				fmt.Println(masterTask)
+				t := NewTask(strings.TrimSpace(taskName))
+				currentTask.AddChild(t)
 
 			case deleteTask: 
+				// TBD: update data-mapper to remove things from the DB
+				// we do updates on quit, but we should do deletes as
+				// they happen - will need a delete op on data mapper
 				taskToKill := currentTask
 				currentTask = moveUp(currentTask)
 				if (!taskToKill.HasParents()) {
 					fmt.Println("Can't delete top level task list")
 				} else {
 					taskToKill.Remove(masterTask)
-					fmt.Println(masterTask)
 				}
 
 			case completeTask:
 				currentTask.SetState(complete)
-				fmt.Println(masterTask)
 
 			case startTask:
 				currentTask.SetState(inProgress)
-				fmt.Println(masterTask)
 
 			case resetTask:
 				currentTask.SetState(notStarted)
-				fmt.Println(masterTask)
 
 			case holdTask:
 				currentTask.SetState(onHold)
-				fmt.Println(masterTask)
+		}
+
+		// most commands want us to reprint the entire list in
+		// its most recent form
+		if printListAfterCmd {
+			fmt.Println(masterTask)
 		}
 	}
-
-	// when quitting - clear tasks table and save current tasks
-	/*
-	_, err = env.db.Exec("TRUNCATE TABLE tasks")
-	if err != nil {
-		log.Fatal(err)
-	} */
 	
-	// save my sub-tasks and their sub-tasks
-	err = saveTask(env, masterTask, -1, true)
+	// save my immediate sub-tasks (don't save grouping master task)
+	err := masterTask.SaveChildren()
 	if err != nil {
 		log.Fatal(err)
 	}		
