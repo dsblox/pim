@@ -6,47 +6,13 @@ import "log"
 import "database/sql"
 
 
-type Mapper interface {
-	Load() string
-	Save() string
-}
-
-type MapperSQL struct {
-	TimesUsed int
-}
-
-func (ms MapperSQL) Load() string {
-	ms.TimesUsed += 1
-	return "Load"
-}
-func (ms *MapperSQL) Save() string {
-	ms.TimesUsed += 1
-	return "Save"
-}
-
-type TestTask struct {
-	m Mapper
-}
-
-func (t* TestTask) SetMapper(newM Mapper) {
-	t.m = newM
-}
-
-func tryMe() {
-	m := &MapperSQL{TimesUsed:0}
-	t := TestTask{}
-	t.SetMapper(m)
-	fmt.Println(m.Load())
-	fmt.Println(m.Save())
-	fmt.Println(m.TimesUsed)
-}
-
-
+// TaskDataMapperPostgreSQL implements TaskDataMapper to persist tasks
 type TaskDataMapperPostgreSQL struct {
 	id int
 	parentIds []int
 }
 
+// TaskDataMapperPostgreSQL accessor and setter functions
 func (tm *TaskDataMapperPostgreSQL) Id() int {
 	return tm.id
 }
