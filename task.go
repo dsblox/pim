@@ -397,15 +397,16 @@ func (t *Task) RemoveChild(k *Task) error {
 
 // Remove: remove me from my parent's child lists and from any children's parent lists
 // if my children are orphaned, optinally make them children of a supplied parent
-// TBD: update data-mapper to remove things from the DB
-// we do updates on quit, but we should do deletes as
-// they happen - will need a delete op on data mapper
 func (t *Task) Remove(newParent *Task) error {
 
 	// delete from storage before we remove from
 	// memory since the data-mapper will need the
-	// loaded object to find the persisted data to delete
-	t.persist.Delete(t)
+	// loaded object to find the persisted data to delete.
+	// don't bother with reparenting my kids - too
+	// hard to coordinate with the logic of only doing
+	// so for orphans, and reparenting should get
+	// fixed on the next save (will it?)
+	t.persist.Delete(t, nil)
 
 	// remove from parent's child lists
 	for _, p := range t.parents {

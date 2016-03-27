@@ -19,8 +19,9 @@ const (
 	startTask
 	resetTask
 	holdTask
+	renameTask
 )
-var cmdChars = []rune{ '?', 'q', 'p', 'a', 'x', 'u', 'd', 'c', 's', 'r', 'h'}
+var cmdChars = []rune{ '?', 'q', 'p', 'a', 'x', 'u', 'd', 'c', 's', 'r', 'h', 'n'}
 
 // findCommand: given an entered rune will look up the command to execute
 func findCommand(entered rune) int {
@@ -38,6 +39,7 @@ func printHelp() {
 	fmt.Println("  p = print task list")
 	fmt.Println("  a = add task as child of current task")
 	fmt.Println("  x = delete current task")
+	fmt.Println("  r = rename current task")
 	fmt.Println("  u = move current task up")
 	fmt.Println("  d = move current task down")
 	fmt.Println("  c = complete current task")
@@ -113,8 +115,8 @@ func main() {
     // pattern to fully abstract the persistence layer from the
     // task functionality.  This should be the only place the
     // Tasks know how they are stored.
-    tdm := NewTaskDataMapperPostgreSQL(-1)
-    masterTask.SetDataMapper(tdm)
+    tdmpg := NewTaskDataMapperPostgreSQL(-1) // this is a pointer to the concrete object
+    masterTask.SetDataMapper(tdmpg)
 
     // load the task list recursively
     masterTask.Load()
@@ -157,6 +159,11 @@ func main() {
 				taskName, _ := reader.ReadString('\n')
 				t := NewTask(strings.TrimSpace(taskName))
 				currentTask.AddChild(t)
+
+			case renameTask: 
+				fmt.Print("Enter new name of current task: ")
+				taskName, _ := reader.ReadString('\n')
+				currentTask.SetName(strings.TrimSpace(taskName))
 
 			case deleteTask: 
 				// TBD: update data-mapper to remove things from the DB

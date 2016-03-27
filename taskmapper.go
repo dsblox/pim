@@ -6,6 +6,42 @@ import "log"
 import "database/sql"
 
 
+type Mapper interface {
+	Load() string
+	Save() string
+}
+
+type MapperSQL struct {
+	TimesUsed int
+}
+
+func (ms MapperSQL) Load() string {
+	ms.TimesUsed += 1
+	return "Load"
+}
+func (ms *MapperSQL) Save() string {
+	ms.TimesUsed += 1
+	return "Save"
+}
+
+type TestTask struct {
+	m Mapper
+}
+
+func (t* TestTask) SetMapper(newM Mapper) {
+	t.m = newM
+}
+
+func tryMe() {
+	m := &MapperSQL{TimesUsed:0}
+	t := TestTask{}
+	t.SetMapper(m)
+	fmt.Println(m.Load())
+	fmt.Println(m.Save())
+	fmt.Println(m.TimesUsed)
+}
+
+
 type TaskDataMapperPostgreSQL struct {
 	id int
 	parentIds []int
@@ -46,7 +82,7 @@ var env *Env = nil
 // TBD - isolate this in a DB layer better and perhaps stop
 // using global variables so we can later support multiple
 // DB connections.
-func NewTaskDataMapperPostgreSQL(id int) TaskDataMapperPostgreSQL {
+func NewTaskDataMapperPostgreSQL(id int) *TaskDataMapperPostgreSQL {
 
 	// if global env not yet initialized then initialize it
 	if env == nil {
@@ -58,7 +94,7 @@ func NewTaskDataMapperPostgreSQL(id int) TaskDataMapperPostgreSQL {
 	}
 
 	// create and return the mapper object
-	return TaskDataMapperPostgreSQL{id:id}
+	return &TaskDataMapperPostgreSQL{id:id}
 }
 
 // NewDataMapper() implements for PostgreSQL the ability to return a new
@@ -68,9 +104,9 @@ func (tm TaskDataMapperPostgreSQL) NewDataMapper() TaskDataMapper {
 	return NewTaskDataMapperPostgreSQL(-1)
 }
 
-func (tm TaskDataMapperPostgreSQL) Save(t *Task) error {
+func (tm *TaskDataMapperPostgreSQL) Save(t *Task) error {
 
-	log.Printf("Save(): task = %s, id = %d, len(parentIds) = %d", t.name, tm.id, len(tm.parentIds))
+	// log.Printf("Save(): task = %s, id = %d, len(parentIds) = %d", t.name, tm.id, len(tm.parentIds))
 
 	// upsert the task itself
 	if tm.id >= 0 {
@@ -101,16 +137,13 @@ func (tm TaskDataMapperPostgreSQL) Save(t *Task) error {
 	// we'll remove them as we go and anything no longer in the parent
 	// list we'll remove at the end
 	savedParentIds := tm.parentIds
-	log.Printf("Save(): len(tm.parentIds) = %d\n", len(tm.parentIds))
-	if len(savedParentIds) > 0 {
-		log.Println(savedParentIds[0])
-	}
 
 	for p := t.FirstParent(); p != nil; p = t.NextParent() {
 
 		// for this parent get it's id - we have to cast any datamapper found
-		tmParent := p.DataMapper()
-		tmParentPG := tmParent.(TaskDataMapperPostgreSQL)
+		var tmParent interface{}
+		tmParent = p.DataMapper()
+		tmParentPG := tmParent.(*TaskDataMapperPostgreSQL)
 		id := tmParentPG.Id()
 
 		// if we got an id then write the parent / child relationship
@@ -144,7 +177,7 @@ func (tm TaskDataMapperPostgreSQL) Save(t *Task) error {
 }
 
 func (tm TaskDataMapperPostgreSQL) LoadChildren(parent *Task) error {
-	log.Printf("LoadChildren(): for parent task %s\n", parent.name)
+	// log.Printf("LoadChildren(): for parent task %s\n", parent.name)
 	var (
 		id int
 		name string
@@ -189,8 +222,9 @@ func (tm TaskDataMapperPostgreSQL) LoadChildren(parent *Task) error {
 		// do some housekeeping to remember that this child came from
 		// a relationship already in the DB so we don't try to recreate
 		// it again later
-		tmKid := k.DataMapper()
-		tmKidPG := tmKid.(TaskDataMapperPostgreSQL)
+		var tmKid interface{}
+		tmKid = k.DataMapper()
+		tmKidPG := tmKid.(*TaskDataMapperPostgreSQL)
 		tmKidPG.AddParentId(tm.id)
 		k.SetDataMapper(tmKidPG)
 
@@ -213,12 +247,59 @@ func (tm TaskDataMapperPostgreSQL) Load(parent *Task) error {
 	return tm.LoadChildren(parent)
 }
 
-func (tm TaskDataMapperPostgreSQL) Delete(t *Task) error {
-	// TBD - delete this task from the tasks table
+func (tm *TaskDataMapperPostgreSQL) Delete(t *Task, reparent *Task) error {
 
-	// TBD - delete all references to this task from task_parents table
+	// make sure we have an id for this task - if not it was never saved
+	// and we have nothing to do here
+	if tm.id == -1 {
+		return nil
+	}
+
+	// if a reparenting is requested - update all tasks to have the new parent
+	reparentId := -1
+	if reparent != nil {
+		var tmNewParent interface{}
+		tmNewParent = reparent.DataMapper()
+		tmNewParentPG := tmNewParent.(*TaskDataMapperPostgreSQL)
+		reparentId = tmNewParentPG.Id()
+	}
+	if reparentId != -1 {
+		// if reparenting is requested and that parent is in the DB already
+		// then reparent this task to the requested new parent
+		_, err := dbExec(env, "UPDATE task_parents SET parent_id = $1 WHERE parent_id = $2", reparentId, tm.id)
+		if err != nil {
+			err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to set new parent on children of task %s from id %d to id %d: %s", t.Name(), tm.id, reparentId, err))
+			return err
+		}
+	} else {
+		// delete all references to this task from task_parents table
+		_, err := dbExec(env, "DELETE FROM task_parents WHERE parent_id = $1", tm.id)
+		if err != nil {
+			err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to delete parent references to task %s with id %d: %s", t.Name(), tm.id, err))
+			return err
+		}
+
+	}
+
+	// remove myself as a child from any parent tasks - no re-childing necessary
+	_, err := dbExec(env, "DELETE FROM task_parents WHERE child_id = $1", tm.id)
+	if err != nil {
+		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to delete child references to task %s with id %d: %s", t.Name(), tm.id, err))
+		return err
+	}
+
+	// delete this task from the tasks table - must do this after deleting from
+	// parent table
+	_, err = dbExec(env, "DELETE FROM tasks WHERE id = $1", tm.id)
+	if err != nil {
+		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to remove task %s with id %d: %s", t.Name(), tm.id, err))
+		return err
+	}
+
 
 	// clean in-memory tm structures
+	tm.id = -1
+	tm.parentIds = nil
 
 	return nil
 }
