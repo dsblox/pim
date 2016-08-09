@@ -116,6 +116,10 @@ func main() {
     // task functionality.  This should be the only place the
     // Tasks know how they are stored.
     tdmpg := NewTaskDataMapperPostgreSQL(-1) // this is a pointer to the concrete object
+    if tdmpg == nil {
+    	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
+    	return
+    }
     masterTask.SetDataMapper(tdmpg)
 
     // load the task list recursively

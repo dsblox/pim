@@ -20,6 +20,7 @@ func NewDB(dataSourceName string) (*sql.DB, error) {
 
 
 
+
 func dbExec(env *Env, sqlStr string, args ...interface{}) (sql.Result, error) {
     result, err := env.db.Exec(sqlStr, args...)
     if err != nil {
@@ -39,4 +40,13 @@ func dbInsert(env *Env, sqlStr string, args ...interface{}) (int, error) {
     }
     return id, err
 }
+
+func dbCreate(env *Env, dbName string) (sql.Result, error) {
+    return dbExec(env, "CREATE DATABASE $1", dbName)
+}
+
+func dbUse(env *Env, dbName string) (sql.Result, error) {
+    return dbExec(env, "USE DATABASE $1", dbName)
+}
+
 

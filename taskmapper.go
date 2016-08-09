@@ -52,9 +52,47 @@ func NewTaskDataMapperPostgreSQL(id int) *TaskDataMapperPostgreSQL {
 
 	// if global env not yet initialized then initialize it
 	if env == nil {
+		// TBD create the database itself - add the create database command to dbinit.sql
+		// and modify this connection string not to specify the pim database but to
+		// merely connect and then run the SQL in dbinit.sql (or run the commands in code here)
+
+		// db, err := NewDB("some string to connect to the db without spedifying the database")
+		// if err != nil {
+		//    postgres is not running or unreachable - return an error
+	    // }
+	    // env = &Env{db: db}		
+
+		// check if the PIM database already exists
+		// one way: 
+		// SELECT 1 AS result FROM pg_database WHERE datname='pim'
+
+		// if it does then connect to it and return the filled in env
+
+		// if it does not then create it and run the needed SQL to initialize an empyt PIM DB
+		/*
+		dbCreate(env, "pim")
+		dbUse("pim")
+   		dbExec(env, 'CREATE TABLE tasks (
+	                 id SERIAL PRIMARY KEY,
+	                 name VARCHAR(1024) NOT NULL,
+	                 state INT NOT NULL,
+	                 created_at DATE,
+	                 modified_at DATE)')
+   		dbExec(env, 'CREATE TABLE task_parents (
+					parent_id INT NOT NULL,
+					child_id INT NOT NULL,
+					created_at DATE,
+					modified_at DATE,
+					CONSTRAINT pk_parents PRIMARY KEY (parent_id,child_id),
+					FOREIGN KEY (parent_id) REFERENCES tasks(id),
+					FOREIGN KEY (child_id) REFERENCES tasks(id) )')
+	     */
+
+		// FOR NOW: assume the DB was manually pre-created
 	    db, err := NewDB("postgres://postgres:postgres@localhost/pim?sslmode=disable")
 	    if err != nil {
-	        log.Panic(err)
+	    	return nil // we should change this function to return an error
+	        // log.Panic(err)
 	    }
 	    env = &Env{db: db}		
 	}
