@@ -2,6 +2,7 @@ package main
 
 import "fmt"
 import "errors"
+import "github.com/satori/go.uuid"
 
 // didn't understand error types as values before - will rework
 // this for proper Go error processing TBD
@@ -20,6 +21,10 @@ const (
 	onHold
 )
 var stateChars = []rune{ '\u0020', '\u2713', '\u27a0', '\u2394'}
+var stateStrings = []string{"notStarted", "complete", "inProgress", "onHold"} // for tests only
+func (ts TaskState) String() string {
+	return stateStrings[ts]
+}
 
 // for persistence we have a mapper interface that can
 // be implemented differently depending on the backend
@@ -28,13 +33,14 @@ var stateChars = []rune{ '\u0020', '\u2713', '\u27a0', '\u2394'}
 // storage backend.
 type TaskDataMapper interface {
 	NewDataMapper() TaskDataMapper // return an empty mapper of your implementation type
-	Save(t *Task) error            // save a task - just the task and parent relationships
-	Load(t *Task) error 		   // load a task - and all its children (note lack of symmetry)
+	Save(t *Task, saveChildren bool, saveMyself bool) error            // save a task - just the task and parent relationships
+	Load(t *Task, loadChildren bool, root bool) error 		   // load a task - and all its children (note lack of symmetry)
 	Delete(t *Task, p *Task) error // delete a task - optionally reparenting its children
 }
 
 // Task: our central type for the whole world here - will become quite large over time
 type Task struct {
+	id string         // unique id of the task - TBD make this pass through to mapper!!!
 	name string          // name of the task
 	state TaskState      // state of the task
 	parents []*Task      // list of parent tasks (we support many parents)
@@ -46,6 +52,7 @@ type Task struct {
 
 	// data-mapper used to abstract persistence from this in-memory task object
 	persist TaskDataMapper
+	memoryonly bool // if true, don't allow this task to be saved
 
 	// iterator support to make iterating with multiple parents sane
 	// TBD move iteration to its own class for concurrent usage in the future
@@ -53,13 +60,30 @@ type Task struct {
 	iterCurrChild int
 }
 
-// NewTask: create a new task with a name and default settings
+// NewTask: create a new task with a name, assign a unique id, and default settings
 // When we break Tasks into its own package we will rename this to just "New()"
 func NewTask(name string) *Task {
-	return &Task{name:name, state:notStarted}
+	return &Task{id:uuid.NewV4().String(), name:name, state:notStarted, memoryonly:false}
+}
+
+// an in-memory-only task that will never be saved - used to group other tasks
+// so you can iterate over them or manipulate them, but designated never to be
+// saved- note that it does have an id
+func NewTaskMemoryOnly(name string) *Task {
+	return &Task{id:uuid.NewV4().String(), name:name, state:notStarted, memoryonly:true}	
+}
+
+func (taska *Task) Equal(taskb *Task) bool {
+	return taska.Id() == taskb.Id()
+}
+func (taska *Task) DeepEqual(taskb *Task) bool {
+	return (taska.id == taskb.id && taska.state == taskb.state && taska.name == taskb.name)
+	// tbd: run child and parent lists and at least ensure their ids match
+	// avoid recursing here as you'll end up running the entire tree in both directions
 }
 
 // SetDataMapper: assign an implementation of data mapper to persist this task
+// or (if memory only) all child tasks that are no memoryonly
 func (t *Task) SetDataMapper(tdm TaskDataMapper) {
 	t.persist = tdm
 }
@@ -124,6 +148,17 @@ func (t Task) String() string {
 	return t.StringHierarchy(0)
 }
 
+// SetId - comment out - id cannot be changed
+/*
+func (t *Task) SetId(newId string) {
+	t.id = newId
+} */
+
+// Id
+func (t *Task) Id() string {
+	return t.id
+}
+
 // SetState: sets the task state
 func (t *Task) SetState(newState TaskState) {
 	t.state = newState
@@ -144,7 +179,13 @@ func (t *Task) Name() string {
 	return t.name
 }
 
-// removeTaskFromSlive: worker function to remove from slice
+// IsMemoryOnly: returns memory-only state indicating
+// if this task should ever be saved or read from storage
+func (t *Task) IsMemoryOnly() bool {
+	return t.memoryonly
+}
+
+// removeTaskFromSlice: worker function to remove from slice
 // note: not part of the Task object
 func removeTaskFromSlice(s []*Task, i int) []*Task {
 	return append(s[:i], s[i+1:]...)
@@ -173,15 +214,44 @@ func (t Task) findParent(p *Task) int {
 	return findTaskInSlice(t.parents, p)
 }
 
+// NumParents: returns the number of parents on a task
+func (t Task) NumParents() int {
+	return len(t.parents)
+}
+
+// NumChildren: returns the number of children on a task
+func (t Task) NumChildren() int {
+	return len(t.kids)
+}
+
 // HasParents: return true if the task has any parents
 func (t Task) HasParents() bool {
-	return len(t.parents) > 0
+	return t.NumParents() > 0
 }
 
 // HasChildren: returns true of the task has any kids
 func (t Task) HasChildren() bool {
-	return len(t.kids) > 0
+	return t.NumChildren() > 0
 }
+
+func (t Task) FindChild(id string) *Task {
+	for _, curr := range t.kids {
+		if id == curr.Id() {
+			return curr
+		}
+	}
+	return nil
+}
+
+func (t Task) FindParent(id string) *Task {
+	for _, curr := range t.parents {
+		if id == curr.Id() {
+			return curr
+		}
+	}
+	return nil	
+}
+
 
 // CurrentParent: returns the first parent found with its
 // current flag set to true.  Used by UIs to track a
@@ -355,10 +425,10 @@ func (t *Task) AddParent(p *Task) error {
 	p.kids = append(p.kids, t)
 
 	// if either is missing a mapper then create it
-	if t.persist == nil {
+	if t.persist == nil && p.persist != nil {
 		t.persist = p.persist.NewDataMapper()
 	}
-	if p.persist == nil {
+	if p.persist == nil && t.persist != nil {
 		p.persist = t.persist.NewDataMapper()
 	}
 	return nil
@@ -406,7 +476,9 @@ func (t *Task) Remove(newParent *Task) error {
 	// hard to coordinate with the logic of only doing
 	// so for orphans, and reparenting should get
 	// fixed on the next save (will it?)
-	t.persist.Delete(t, nil)
+	if t.persist != nil {
+		t.persist.Delete(t, nil)
+	}
 
 	// remove from parent's child lists
 	for _, p := range t.parents {
@@ -415,7 +487,7 @@ func (t *Task) Remove(newParent *Task) error {
 
 	// remove from kids parent lists
 	// replacing with new parent if specified
-	// and child would be orphaned otherwise
+	// and child will be orphaned otherwise
 	for _, k := range t.kids {
 		k.RemoveParent(t)
 		if newParent != nil && !k.HasChildren() {
@@ -425,67 +497,68 @@ func (t *Task) Remove(newParent *Task) error {
 	return nil
 }
 
-// Save: saves the task with whatever persistence has been set on the
-// task via the DataMapper
-func (t *Task) Save() error {
-	// save myself
-	err := t.persist.Save(t)
+/*
+=================================================================================
+ Task.Save()
+---------------------------------------------------------------------------------
+ Inputs: saveChildren bool - true: recursively save all children
+                           - false: save just this task and parent relationships
+
+ Save the task to storage and (optionally) all of its children.  It is important
+ to note that the "storage unit" assumed is the task itself and all of this
+ task's parent relationships.
+
+ Save is where we enforce the memory-only setting on a task, but it is ONLY
+ ENFORCED AT THE TOP LEVEL - Mappers are free to ignore the setting for children 
+ in the middle of the hierarhcy!
+
+ Note that we leave the implementation of the recursion to the Mapper so it
+ can take advantage of clever ways to load objects in bulk from whatever its
+ storage mechanism is.     
+===============================================================================*/
+func (t *Task) Save(saveChildren bool) error {
+
+	// log.Printf("Task.Save() id:%s, name:%s, memoryonly:%t\n", t.Id(), t.Name(), t.memoryonly)
+
+	// if memory only and not saving children then nothing to do
+	if t.memoryonly && !saveChildren {
+		return nil
+	}
+
+	// save my children if requested, and save myself if not memory only
+	err := t.persist.Save(t, saveChildren, !t.memoryonly)
 	if err != nil {
 		return err
 	}
 
-	// recurse to save my children - SaveChildren will call Save()
-	return t.SaveChildren()
-}
-
-/*
-// Load reads in a task from the DB as long as the task's
-// persistent_id has been set.  This function will replace
-// the task's current in-memory information with what is
-// in the database - will this be rare or will it recurse
-// based on finding parent ids in the DB?
-func (t *Task) Load(env *Env) error {
-
-	// if no persistent_id then error
-	if t.persistent_id < 0 {
-		return errors.New("task.Load(): no identifier provided to load from")
-	}
-
-	// query for the item
-	err := env.db.QueryRow("SELECT name, state FROM tasks where id = $1", t.persistent_id).Scan(&t.name, &t.state)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	return nil
-} */
-
-// SaveChildren only saves the children, which is a good and
-// charitable thing to do.  Note that it does not save the
-// grouping parent task.
-func (t *Task) SaveChildren() error {
-	var err error = nil
-	for c := t.FirstChild(); c != nil && err == nil; c = t.NextChild() {
-		err = c.Save()
-	}
-	return err
 }
 
-// needed? 
-/*
-func LoadTasks(env *Env, tasks []*Task) error {
-	var err error = nil
-	for _, t := range tasks {
-		err = t.Load(env)
-	}
-	return err
-} */
 
-// load all tasks and add as children of parent task
-// eventually we'll adjust this to load all
-// tasks that are children of a particular
-// parent task
-func (t *Task) Load() error {
-	return t.persist.Load(t)
+
+/*
+=================================================================================
+ Task.Load()
+---------------------------------------------------------------------------------
+ Inputs: loadChildren bool - true to recursively load all children
+                           - false loads the task (not its parent relationships!)
+
+ Load the task with this id from storage and (optionally) all of its children.  
+ Note the versatility of this function based on the kind / state of this task.
+   - if this task is memory-only then it will simply attach "root" tasks
+     as children to this task (and their children if specified)
+   - if this task is not memory-only then it will load from storage any
+     task with a matching id (and its children if specified)
+
+ If loadChildren is not specified then no parent relationships are loaded.
+ This is because the assumption is always that tasks are loaded "top down"
+ so it makes no sense to load parent tasks "bottom up".
+
+ Note that we leave the implementation of the recursion to the Mapper so it
+ can take advantage of clever ways to load objects in bulk from whatever its
+ storage mechanism is.
+===============================================================================*/
+func (t *Task) Load(loadChildren bool) error {
+	return t.persist.Load(t, loadChildren, t.memoryonly)
 }
 

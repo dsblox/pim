@@ -6,6 +6,12 @@ import "os"
 import "strings"
 import "log"
 
+import (
+     // "reflect"
+//     _ "github.com/lib/pq"
+ )
+
+
 type PimCmd int
 const (
 	help = iota 
@@ -20,8 +26,9 @@ const (
 	resetTask
 	holdTask
 	renameTask
+	debugTask
 )
-var cmdChars = []rune{ '?', 'q', 'p', 'a', 'x', 'u', 'd', 'c', 's', 'r', 'h', 'n'}
+var cmdChars = []rune{ '?', 'q', 'p', 'a', 'x', 'u', 'd', 'c', 's', 'r', 'h', 'n', '~'}
 
 // findCommand: given an entered rune will look up the command to execute
 func findCommand(entered rune) int {
@@ -46,6 +53,7 @@ func printHelp() {
 	fmt.Println("  s = start current task")
 	fmt.Println("  r = reset current task to not started")
 	fmt.Println("  h = put current task on hold")
+	fmt.Println("  ~ = debug by dumping all info on current task")
 	fmt.Println("  ? = help")
 	fmt.Println("  q = quit")
 }
@@ -100,14 +108,22 @@ func moveDown(oldCurrentTask *Task) *Task {
 	return newCurrentTask
 }
 
+func checkErr(err error) {
+    if err != nil {
+        panic(err)
+    }
+}
+
+
 // main: for now this is the console app - in the future input args will choose
 // console app vs. web server
 func main() {
     fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
 
+
     // dummy master task to hold all tasks - this is for conveniece
-    // and should not be printed out
-    var masterTask *Task = &Task{name:"Your Console Task List", state:notStarted}
+    // and should not be printed out or saved.
+    var masterTask *Task = NewTaskMemoryOnly("Your Console Task List")
 
     // initialize the persistence layer - use PostgreSQL
     // and assign to masterTask - creating the first data
@@ -115,7 +131,7 @@ func main() {
     // pattern to fully abstract the persistence layer from the
     // task functionality.  This should be the only place the
     // Tasks know how they are stored.
-    tdmpg := NewTaskDataMapperPostgreSQL(-1) // this is a pointer to the concrete object
+    tdmpg := NewTaskDataMapperPostgreSQL(false) // this is a pointer to the concrete object
     if tdmpg == nil {
     	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
     	return
@@ -123,7 +139,7 @@ func main() {
     masterTask.SetDataMapper(tdmpg)
 
     // load the task list recursively
-    masterTask.Load()
+    masterTask.Load(true)
 
 	// keep track of a "cursor" task on which to work
     var currentTask *Task = masterTask
@@ -170,9 +186,6 @@ func main() {
 				currentTask.SetName(strings.TrimSpace(taskName))
 
 			case deleteTask: 
-				// TBD: update data-mapper to remove things from the DB
-				// we do updates on quit, but we should do deletes as
-				// they happen - will need a delete op on data mapper
 				taskToKill := currentTask
 				currentTask = moveUp(currentTask)
 				if (!taskToKill.HasParents()) {
@@ -192,6 +205,11 @@ func main() {
 
 			case holdTask:
 				currentTask.SetState(onHold)
+
+			case debugTask:
+				fmt.Printf("name = %s\n", currentTask.Name())
+				fmt.Printf("id = %s\n", currentTask.Id())
+				fmt.Printf("state = %s\n", currentTask.State())
 		}
 
 		// most commands want us to reprint the entire list in
@@ -201,8 +219,8 @@ func main() {
 		}
 	}
 	
-	// save my immediate sub-tasks (don't save grouping master task)
-	err := masterTask.SaveChildren()
+	// save my immediate sub-tasks (won't save grouping master task)
+	err := masterTask.Save(true)
 	if err != nil {
 		log.Fatal(err)
 	}		

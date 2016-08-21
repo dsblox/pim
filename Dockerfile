@@ -1,12 +1,12 @@
 FROM golang:1.6
 
 # download the pim, build it and install it
-RUN go get github.com/dsblox/pim/... #force by changing this number 3
+RUN go get github.com/dsblox/pim/... #force by changing this number 4
 
 # set up some aliases useful in our development environment
 RUN echo 'alias cd-pim="cd /go/src/github.com/dsblox/pim"' >> ~/.bashrc
 RUN echo 'alias run-pim="cd-pim;pim"' >> ~/.bashrc
-RUN echo 'alias make-mss="cd-pim;go install"' >> ~/.bashrc
+RUN echo 'alias make-pim="cd-pim;go install"' >> ~/.bashrc
 
 # CMD is only executed if another command is not specified on the docker run command
 # so if container is run as a daemon then assume we are running the server
