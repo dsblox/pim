@@ -10,6 +10,7 @@ const (
     DB_USER     = "postgres"
     DB_PASSWORD = "postgres"
     DB_NAME     = "pim"
+    DB_HOST_ENV = "DAB_DB_HOST" // an environment variable i cause to be created
 )
 
 // TaskDataMapperPostgreSQL implements TaskDataMapper to persist tasks
@@ -81,7 +82,7 @@ var env *Env = nil
 func CreateEmptyPIMDatabase(dbHost string) error {
 
 	// output to the console (log?) what's going on
-	fmt.Print("PIM Database not found - creating empty database...")
+	fmt.Println("PIM Database not found - creating empty database...")
 
 	// open db without the database - this links to postgres' default DB
 	// NOTE: there is no way in Postgres to connect without linking to _some_ DB
@@ -117,8 +118,12 @@ func NewTaskDataMapperPostgreSQL(saved bool) *TaskDataMapperPostgreSQL {
 	// if global env not yet initialized then initialize it
 	if env == nil {
 
-	    // find the DB host from env variable (docker standard env format for linked containers)
-	    dbHost := os.Getenv("DB_PORT_5432_TCP_ADDR")
+	    // find the DB host from env variable
+	    dbHost := os.Getenv(DB_HOST_ENV)
+	    if len(dbHost) == 0 {
+		    fmt.Printf(" Aborting: DB host not found in expected environment variable: DB_PORT_5432_TCP_ADDR\n")
+		    return nil // we should change this function to return an error
+	    }
 
 	    // connect to the PIM database
 	    dbinfo := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, DB_USER, DB_PASSWORD, DB_NAME)

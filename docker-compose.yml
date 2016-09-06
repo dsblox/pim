@@ -1,0 +1,53 @@
+version: '2'
+
+services:
+
+  # at this point we're only set up for development since we don't have a UI
+  # or real server to run in daemon mode yet - but presumably we can enhance
+  # this with different "profiles" for production which would not include
+  # the volumes or working_dir directives.  For dev, this is intended to be used
+  # by calling: 
+  #   docker-compose run --rm app
+  # which will drop you into a source-code-mounted, interactive session for dev
+  # and will "make sure" the postgres DB server is running and linked, creating
+  # if as needed
+  app:
+    image: dsblox/pim
+    ports: 
+      - "4000:4000" # will be needed soon
+    volumes: # these directory environment variables are set in dev-env.sh
+      - ${HOST_PIM_PATH}:${CONT_PIM_PATH}
+    working_dir: ${CONT_PIM_PATH}
+    depends_on:
+      - db
+    links: 
+      - db
+    environment:
+      # i preferred to have the PIM code use env for host lookup than 
+      # hard-coding the host.  Docker does set up a "host" within the
+      # container with the same name as the link alias.
+      DAB_DB_HOST: db 
+
+  # for development it can be convenient to jump into psql to play with
+  # the database directly.  Use by calling:
+  #  docker-compose run --rm psql
+  psql:
+    image: postgres
+    environment: 
+      PGPASSWORD: postgres
+    depends_on:
+      - db
+    links:
+      - db:postgres
+    command: psql -h postgres -U postgres
+
+  # a simple posgres instance - the app will initialize this DB if it
+  # finds it empty - so vanilla postgres is all that is needed here
+  # designed in both dev and production to be run in daemon mode:
+  # docker-compose run -d db    to run just the DB
+  # docker-compose 
+  db:
+    image: postgres
+    environment: 
+      POSTGRES_PASSWORD: postgres
+
