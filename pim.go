@@ -1,10 +1,14 @@
 package main
 
-import "fmt"
-import "bufio"
-import "os"
-import "strings"
-import "log"
+import (
+	"fmt"
+	"bufio"
+	"os"
+	"strings"
+	"log"
+	"flag"
+	"net/http"
+)
 
 import (
      // "reflect"
@@ -114,12 +118,8 @@ func checkErr(err error) {
     }
 }
 
-
-// main: for now this is the console app - in the future input args will choose
-// console app vs. web server
-func main() {
+func runConsoleApp() {
     fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
-
 
     // dummy master task to hold all tasks - this is for conveniece
     // and should not be printed out or saved.
@@ -223,5 +223,169 @@ func main() {
 	err := masterTask.Save(true)
 	if err != nil {
 		log.Fatal(err)
-	}		
+	}			
 }
+
+func runServerApp(port string, html string, certs string) {
+	fmt.Printf("Will run as server soon\n")	
+
+	// lets try to get into HTTP ourselves at /mss
+	// http.Handle("/pim/", &MessageSecureSend{})	
+	
+	// use built-in file server to serve our client application at /
+	log.Printf("...serving static pages from %s\n", html)
+	http.Handle("/", http.FileServer(http.Dir(html)))
+
+	// start the server itself
+	log.Printf("...serving certificates from %s\n", certs)
+	log.Printf("...listening on port%s\n", port)
+	err := http.ListenAndServeTLS(port, certs + "self-signed.crt", certs + "server.key", nil)
+	if err != nil {
+		log.Fatal(err)
+	}	
+
+}
+
+// main: for now this is the console app - in the future input args will choose
+// console app vs. web server
+func main() {
+
+	var server					bool
+	var static_files_location	string
+	var certs_location 			string
+	var listenport 				string
+	flag.BoolVar(&server, "server", false, "start pim as web server rather than console app")
+	flag.StringVar(&static_files_location, "html", "./client", "specify path to static web files on this server")
+	flag.StringVar(&certs_location, "certs", ".", "specify path to TLS certificates on this server")
+	flag.StringVar(&listenport, "port", "4000", "specify port on which the server will take requests")
+	flag.Parse()
+
+	// if we're starting as a server
+	if (server) {
+
+		// normalize file locations and port syntax so we can be flexible with
+		// what the user types in
+		if !strings.HasSuffix(certs_location, "/") {
+			certs_location = certs_location + "/"
+		}
+		if strings.HasSuffix(static_files_location, "/") {
+			static_files_location = strings.TrimSuffix(static_files_location, "/")
+		}
+		if !strings.HasPrefix(listenport, ":") {
+			listenport = ":" + listenport
+		}
+
+		runServerApp(listenport, static_files_location, certs_location)
+
+	} else {
+
+		runConsoleApp()
+		/*
+	    fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
+
+
+	    // dummy master task to hold all tasks - this is for conveniece
+	    // and should not be printed out or saved.
+	    var masterTask *Task = NewTaskMemoryOnly("Your Console Task List")
+
+	    // initialize the persistence layer - use PostgreSQL
+	    // and assign to masterTask - creating the first data
+	    // mapper initializes the DB - I chose to test a data-mapper
+	    // pattern to fully abstract the persistence layer from the
+	    // task functionality.  This should be the only place the
+	    // Tasks know how they are stored.
+	    tdmpg := NewTaskDataMapperPostgreSQL(false) // this is a pointer to the concrete object
+	    if tdmpg == nil {
+	    	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
+	    	return
+	    }
+	    masterTask.SetDataMapper(tdmpg)
+
+	    // load the task list recursively
+	    masterTask.Load(true)
+
+		// keep track of a "cursor" task on which to work
+	    var currentTask *Task = masterTask
+	    currentTask.current = true
+		printHelp()
+		fmt.Println(masterTask)
+
+		// start the "event loop" based on user input
+		reader := bufio.NewReader(os.Stdin)
+		var printListAfterCmd bool = true
+	    for cmd := printList; cmd != quit;  {
+
+			printListAfterCmd = true
+			fmt.Print("Command: ")
+			text, _ := reader.ReadString('\n')
+			cmd = findCommand(([]rune(text))[0])
+			switch cmd {
+				case help: 
+					printHelp()
+					printListAfterCmd = false
+
+				case printList: 
+					printListAfterCmd = true // happens anyway
+
+				case quit: 
+					fmt.Println("Goodbye!")
+					printListAfterCmd = false
+
+				case upCurrent: 
+					currentTask = moveUp(currentTask)
+
+				case downCurrent: 
+					currentTask = moveDown(currentTask)
+
+				case addTask: 
+					fmt.Print("Enter name of new task: ")
+					taskName, _ := reader.ReadString('\n')
+					t := NewTask(strings.TrimSpace(taskName))
+					currentTask.AddChild(t)
+
+				case renameTask: 
+					fmt.Print("Enter new name of current task: ")
+					taskName, _ := reader.ReadString('\n')
+					currentTask.SetName(strings.TrimSpace(taskName))
+
+				case deleteTask: 
+					taskToKill := currentTask
+					currentTask = moveUp(currentTask)
+					if (!taskToKill.HasParents()) {
+						fmt.Println("Can't delete top level task list")
+					} else {
+						taskToKill.Remove(masterTask)
+					}
+
+				case completeTask:
+					currentTask.SetState(complete)
+
+				case startTask:
+					currentTask.SetState(inProgress)
+
+				case resetTask:
+					currentTask.SetState(notStarted)
+
+				case holdTask:
+					currentTask.SetState(onHold)
+
+				case debugTask:
+					fmt.Printf("name = %s\n", currentTask.Name())
+					fmt.Printf("id = %s\n", currentTask.Id())
+					fmt.Printf("state = %s\n", currentTask.State())
+			}
+
+			// most commands want us to reprint the entire list in
+			// its most recent form
+			if printListAfterCmd {
+				fmt.Println(masterTask)
+			}
+		}
+		
+		// save my immediate sub-tasks (won't save grouping master task)
+		err := masterTask.Save(true)
+		if err != nil {
+			log.Fatal(err)
+		}		*/
+	} // else we started app as a console app
+} // main

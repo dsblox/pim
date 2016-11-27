@@ -1,7 +1,7 @@
 FROM golang:1.6
 
 # download the pim, build it and install it
-RUN go get github.com/dsblox/pim/... #force by changing this number 5
+RUN go get github.com/dsblox/pim/... #force by changing this number 6
 
 # set up some aliases useful in our development environment
 RUN echo 'alias cd-pim="cd /go/src/github.com/dsblox/pim"' >> ~/.bashrc
@@ -15,4 +15,4 @@ RUN echo 'alias make-pim="cd-pim;go install"' >> ~/.bashrc
 # CMD pim -- when we have a server we can uncomment this line
 
 # when we have a server we can uncomment any exposed port
-# EXPOSE 4000
+EXPOSE 4000
