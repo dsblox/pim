@@ -118,12 +118,10 @@ func checkErr(err error) {
     }
 }
 
-func runConsoleApp() {
-    fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
-
+func initMasterTask() *Task {
     // dummy master task to hold all tasks - this is for conveniece
     // and should not be printed out or saved.
-    var masterTask *Task = NewTaskMemoryOnly("Your Console Task List")
+    var masterTask *Task = NewTaskMemoryOnly("Your Task List")
 
     // initialize the persistence layer - use PostgreSQL
     // and assign to masterTask - creating the first data
@@ -134,12 +132,20 @@ func runConsoleApp() {
     tdmpg := NewTaskDataMapperPostgreSQL(false) // this is a pointer to the concrete object
     if tdmpg == nil {
     	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
-    	return
+    	return nil
     }
     masterTask.SetDataMapper(tdmpg)
 
     // load the task list recursively
     masterTask.Load(true)
+
+    return masterTask
+}
+
+func runConsoleApp() {
+    fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
+
+	masterTask := initMasterTask()    
 
 	// keep track of a "cursor" task on which to work
     var currentTask *Task = masterTask
@@ -207,9 +213,9 @@ func runConsoleApp() {
 				currentTask.SetState(onHold)
 
 			case debugTask:
-				fmt.Printf("name = %s\n", currentTask.Name())
-				fmt.Printf("id = %s\n", currentTask.Id())
-				fmt.Printf("state = %s\n", currentTask.State())
+				fmt.Printf("name = %s\n", currentTask.GetName())
+				fmt.Printf("id = %s\n", currentTask.GetId())
+				fmt.Printf("state = %s\n", currentTask.GetState())
 		}
 
 		// most commands want us to reprint the entire list in
@@ -226,25 +232,34 @@ func runConsoleApp() {
 	}			
 }
 
-func runServerApp(port string, html string, certs string) {
-	fmt.Printf("Will run as server soon\n")	
+// for now keep a global - temp as we build our API
+// eventually we'll move this in somewhere else
+var master *Task
 
-	// lets try to get into HTTP ourselves at /mss
-	// http.Handle("/pim/", &MessageSecureSend{})	
+func runServerApp(port string, files string, certs string) {
+	log.Printf("Will run as server soon\n")	
+
+	// initialize a master task (in global for now)
+	// that knows how to map to a database
+	master = initMasterTask()
+
+	// create an instance of our router with path to files
+    router := NewRouter(files)
 	
 	// use built-in file server to serve our client application at /
-	log.Printf("...serving static pages from %s\n", html)
-	http.Handle("/", http.FileServer(http.Dir(html)))
+	// TBD: integrate this into our router???
+	log.Printf("...serving static pages from %s\n", files)
 
 	// start the server itself
 	log.Printf("...serving certificates from %s\n", certs)
 	log.Printf("...listening on port%s\n", port)
-	err := http.ListenAndServeTLS(port, certs + "self-signed.crt", certs + "server.key", nil)
+	err := http.ListenAndServeTLS(port, certs + "self-signed.crt", certs + "server.key", router)
 	if err != nil {
 		log.Fatal(err)
 	}	
 
 }
+
 
 // main: for now this is the console app - in the future input args will choose
 // console app vs. web server

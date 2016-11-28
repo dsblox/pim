@@ -196,15 +196,15 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 
 		// upsert the task itself
 		if tm.loaded {
-			_, err := dbExec(env, "UPDATE tasks SET name = $1, state = $2 WHERE ID = $3", t.name, t.state, t.id)
+			_, err := dbExec(env, "UPDATE tasks SET name = $1, state = $2 WHERE ID = $3", t.Name, t.State, t.Id)
 			if (err != nil) {
-				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to update task %s: %s", t.name, err))
+				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to update task %s: %s", t.Name, err))
 				return err
 			}
 		} else {
-	    	_, err := dbExec(env, `INSERT INTO tasks (id, name, state) VALUES ($1, $2, $3) RETURNING id`, t.id, t.name, t.state)
+	    	_, err := dbExec(env, `INSERT INTO tasks (id, name, state) VALUES ($1, $2, $3) RETURNING id`, t.Id, t.Name, t.State)
 			if (err != nil)	{ 
-				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert task %s: %s", t.name, err))
+				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert task %s: %s", t.Name, err))
 				return err
 			}
 			tm.MarkInDB()
@@ -224,7 +224,7 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 		for p := t.FirstParent(); p != nil; p = t.NextParent() {
 
 			// for this parent get it's id
-			id := p.Id()
+			id := p.GetId()
 
 			// for this parent make sure it is in the database
 			// and if it is not we will skip it!  we assume saves
@@ -249,9 +249,9 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 					// DB before we call insert - because the insert will fail for data
 					// integrity reasons if the parent is not already in the DB
 					// assert tmParent.IsInDB()
-					_, err := dbInsert(env, "INSERT INTO task_parents (parent_id, child_id) VALUES ($1, $2)", id, t.Id())
+					_, err := dbInsert(env, "INSERT INTO task_parents (parent_id, child_id) VALUES ($1, $2)", id, t.GetId())
 					if err != nil	{ 
-						err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert parent relationship between parent task %s and child task %s: %s", p.Name(), t.Name(), err))
+						err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert parent relationship between parent task %s and child task %s: %s", p.GetName(), t.GetName(), err))
 						return err
 					}
 					tm.AddParentId(id)
@@ -262,9 +262,9 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 		// once we've looped through all the parents, anything left needs to
 		// be removed - it means the parentage that was once saved is no longer there
 		for _, idParent := range savedParentIds {
-			_, err := dbExec(env, "DELETE FROM task_parents WHERE parent_id = $1 AND child_id = $2", idParent, t.Id())
+			_, err := dbExec(env, "DELETE FROM task_parents WHERE parent_id = $1 AND child_id = $2", idParent, t.GetId())
 			if err != nil {
-				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to remove obsolete parent relationship with parent id %d to child task %s: %s", idParent, t.Name(), err))
+				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to remove obsolete parent relationship with parent id %d to child task %s: %s", idParent, t.GetName(), err))
 				return err
 			}
 		}
@@ -334,7 +334,7 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 	if (!root) {
 
 		// build and execute the query for the task
-		taskQuery := "SELECT name, state FROM tasks WHERE id = '" + t.Id() + "'"
+		taskQuery := "SELECT name, state FROM tasks WHERE id = '" + t.GetId() + "'"
 		err := env.db.QueryRow(taskQuery).Scan(&name, &state)
 		if err != nil {
 			// log.Printf("query for a task failed: %s, err: %s\n", taskQuery, err)
@@ -377,7 +377,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
     if root {
     	sqlSelect = fmt.Sprintf(baseQuery, "IS NULL")
 	} else {
-		sqlSelect = fmt.Sprintf(baseQuery, fmt.Sprintf("= '%s'", parent.Id()))
+		sqlSelect = fmt.Sprintf(baseQuery, fmt.Sprintf("= '%s'", parent.GetId()))
 	}
 
 	// make the query for the kids
@@ -398,7 +398,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 		// log.Printf("LoadChildren(): read id=%s, name=%s\n", id, name)
 
 		// create the child task
-		k := &Task{id:id, name:name, state:state}
+		k := &Task{Id:id, Name:name, State:state}
 
 		// set the data mapper onto the child indicating that it was loaded from DB
 		kdm := NewTaskDataMapperPostgreSQL(true)
@@ -410,7 +410,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 		// do some housekeeping to remember that this child came from
 		// a relationship already in the DB so we don't try to recreate
 		// it again later
-		kdm.AddParentId(parent.Id())
+		kdm.AddParentId(parent.GetId())
 
 		// now that the child is fully loaded, recurse to go get it's children
 		err = kdm.loadChildren(k, false)
@@ -442,33 +442,33 @@ func (tm *TaskDataMapperPostgreSQL) Delete(t *Task, reparent *Task) error {
 	if bReparent {
 		// if reparenting is requested and that parent is in the DB already
 		// then reparent this task to the requested new parent
-		_, err := dbExec(env, "UPDATE task_parents SET parent_id = $1 WHERE parent_id = $2", reparent.Id(), t.Id())
+		_, err := dbExec(env, "UPDATE task_parents SET parent_id = $1 WHERE parent_id = $2", reparent.GetId(), t.GetId())
 		if err != nil {
-			err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to set new parent on children of task %s from id %d to id %d: %s", t.Name(), t.Id(), reparent.Id(), err))
+			err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to set new parent on children of task %s from id %d to id %d: %s", t.GetName(), t.GetId(), reparent.GetId(), err))
 			return err
 		}
 	} else {
 		// delete all references to this task from task_parents table
-		_, err := dbExec(env, "DELETE FROM task_parents WHERE parent_id = $1", t.Id())
+		_, err := dbExec(env, "DELETE FROM task_parents WHERE parent_id = $1", t.GetId())
 		if err != nil {
-			err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to delete parent references to task %s with id %d: %s", t.Name(), t.Id(), err))
+			err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to delete parent references to task %s with id %d: %s", t.GetName(), t.GetId(), err))
 			return err
 		}
 
 	}
 
 	// remove myself as a child from any parent tasks - no re-childing necessary
-	_, err := dbExec(env, "DELETE FROM task_parents WHERE child_id = $1", t.Id())
+	_, err := dbExec(env, "DELETE FROM task_parents WHERE child_id = $1", t.GetId())
 	if err != nil {
-		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to delete child references to task %s with id %d: %s", t.Name(), t.Id(), err))
+		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to delete child references to task %s with id %d: %s", t.GetName(), t.GetId(), err))
 		return err
 	}
 
 	// delete this task from the tasks table - must do this after deleting from
 	// parent table
-	_, err = dbExec(env, "DELETE FROM tasks WHERE id = $1", t.Id())
+	_, err = dbExec(env, "DELETE FROM tasks WHERE id = $1", t.GetId())
 	if err != nil {
-		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to remove task %s with id %d: %s", t.Name(), t.Id(), err))
+		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to remove task %s with id %d: %s", t.GetName(), t.GetId(), err))
 		return err
 	}
 

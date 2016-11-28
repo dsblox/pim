@@ -12,7 +12,7 @@ RUN echo 'alias make-pim="cd-pim;go install"' >> ~/.bashrc
 # so if container is run as a daemon then assume we are running the server
 # but if container is run with -it and /bin/bash as the command then the server won't be started
 # . and we can build and restart the server in a dev / test environment.
-# CMD pim -- when we have a server we can uncomment this line
+CMD pim -server
 
 # when we have a server we can uncomment any exposed port
 EXPOSE 4000

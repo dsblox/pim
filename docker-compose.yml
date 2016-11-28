@@ -2,31 +2,49 @@ version: '2'
 
 services:
 
-  # at this point we're only set up for development since we don't have a UI
-  # or real server to run in daemon mode yet - but presumably we can enhance
-  # this with different "profiles" for production which would not include
-  # the volumes or working_dir directives.  For dev, this is intended to be used
-  # by calling: 
-  #   docker-compose run --rm app
-  # which will drop you into a source-code-mounted, interactive session for dev
-  # and will "make sure" the postgres DB server is running and linked, creating
-  # if as needed
+  # app service - can be used in development interactively or production
+  #
+  #   Development - start with docker-compose run --rm --service-ports --entrypoint=/bin/bash app
+  #   Production  - start with docker-compose up -d
+  #
+  #   run -rm will create an interactive shell in which we can manually
+  #   start the server as we develop to test things. (rm means remove
+  #   after running and auto-runs shell).  We also expose service-ports
+  #   (since run doesn't do this automatically) and override sh to
+  #   use bash.
+  #
+  #   up -d will run the default command (server mode) of the app as
+  #   a daemon
+  #
+  #   both approaches will auto-create the dependent DB container.
+  #
+  #   TBD - define the psql container in such a way that it is available
+  #         to be docker-compose run -rm psql (as it is today) but won't
+  #         attempt to start when we run docker-compose up (as it does
+  #         today).  Note - there doesn't seem to be a way to do this
+  #         without multiple yml files (which I hate)...
+  #         https://github.com/docker/compose/issues/1896
+  #
+  #   note that right now this will mount the source in both environments
+  #   which eventually we will not want to do and will probably have some
+  #   solution that requires two docker-compose files and leverages extends.
   app:
     image: dsblox/pim
     ports: 
-      - "4000:4000" # will be needed soon
-    volumes: # these directory environment variables are set in dev-env.sh
-      - ${HOST_PIM_PATH}:${CONT_PIM_PATH}
+      - "4000:4000"
     working_dir: ${CONT_PIM_PATH}
-    depends_on:
-      - db
-    links: 
-      - db
     environment:
       # i preferred to have the PIM code use env for host lookup than 
       # hard-coding the host.  Docker does set up a "host" within the
       # container with the same name as the link alias.
       DAB_DB_HOST: db 
+    volumes: # these directory environment variables are set in dev-env.sh
+      - ${HOST_PIM_PATH}:${CONT_PIM_PATH}
+    depends_on:
+      - db
+    links:
+      - db
+
 
   # for development it can be convenient to jump into psql to play with
   # the database directly.  Use by calling:

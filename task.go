@@ -4,6 +4,7 @@ import "fmt"
 import "errors"
 import "github.com/satori/go.uuid"
 
+
 // didn't understand error types as values before - will rework
 // this for proper Go error processing TBD
 type ErrTaskNotFoundInList int
@@ -40,9 +41,9 @@ type TaskDataMapper interface {
 
 // Task: our central type for the whole world here - will become quite large over time
 type Task struct {
-	id string         // unique id of the task - TBD make this pass through to mapper!!!
-	name string          // name of the task
-	state TaskState      // state of the task
+	Id string  `json:"id"`        // unique id of the task - TBD make this pass through to mapper!!!
+	Name string `json:"name"`     // name of the task
+	State TaskState `json:state"` // state of the task
 	parents []*Task      // list of parent tasks (we support many parents)
 	kids []*Task         // list of child tasks
 
@@ -59,25 +60,37 @@ type Task struct {
 	iterCurrParent int
 	iterCurrChild int
 }
+type Tasks []*Task
+
+func (list Tasks) FindById(id string) *Task {
+	for _, curr := range list {
+		if id == curr.GetId() {
+			return curr
+		}
+	}
+	return nil
+}
+
+
 
 // NewTask: create a new task with a name, assign a unique id, and default settings
 // When we break Tasks into its own package we will rename this to just "New()"
 func NewTask(name string) *Task {
-	return &Task{id:uuid.NewV4().String(), name:name, state:notStarted, memoryonly:false}
+	return &Task{Id:uuid.NewV4().String(), Name:name, State:notStarted, memoryonly:false}
 }
 
 // an in-memory-only task that will never be saved - used to group other tasks
 // so you can iterate over them or manipulate them, but designated never to be
 // saved- note that it does have an id
 func NewTaskMemoryOnly(name string) *Task {
-	return &Task{id:uuid.NewV4().String(), name:name, state:notStarted, memoryonly:true}	
+	return &Task{Id:uuid.NewV4().String(), Name:name, State:notStarted, memoryonly:true}	
 }
 
 func (taska *Task) Equal(taskb *Task) bool {
-	return taska.Id() == taskb.Id()
+	return taska.GetId() == taskb.GetId()
 }
 func (taska *Task) DeepEqual(taskb *Task) bool {
-	return (taska.id == taskb.id && taska.state == taskb.state && taska.name == taskb.name)
+	return (taska.Id == taskb.Id && taska.State == taskb.State && taska.Name == taskb.Name)
 	// tbd: run child and parent lists and at least ensure their ids match
 	// avoid recursing here as you'll end up running the entire tree in both directions
 }
@@ -95,7 +108,7 @@ func (t *Task) DataMapper() TaskDataMapper {
 
 // stateChar: map from current state to the UTF-8 code for console display of the state
 func (t Task) stateChar() string {
-	return string(stateChars[t.state])
+	return string(stateChars[t.State])
 }
 
 // StringSingle: display an individual task indented to the requested level
@@ -113,7 +126,7 @@ func (t Task) StringSingle(level int) string {
 	} else {
 		s += " "
 	}
-	s += fmt.Sprintf("[%v] %v (%d sub-tasks)", t.stateChar(), t.name, len(t.kids))
+	s += fmt.Sprintf("[%v] %v (%d sub-tasks)", t.stateChar(), t.Name, len(t.kids))
 	return s
 }
 
@@ -155,34 +168,38 @@ func (t *Task) SetId(newId string) {
 } */
 
 // Id
-func (t *Task) Id() string {
-	return t.id
+func (t *Task) GetId() string {
+	return t.Id
 }
 
 // SetState: sets the task state
 func (t *Task) SetState(newState TaskState) {
-	t.state = newState
+	t.State = newState
 }
 
 // State: returns the current state of the task
-func (t *Task) State() TaskState {
-	return t.state
+func (t *Task) GetState() TaskState {
+	return t.State
 }
 
 // SetName: sets the name field
 func (t *Task) SetName(newName string) {
-	t.name = newName
+	t.Name = newName
 }
 
 // Name: returns the name field
-func (t *Task) Name() string {
-	return t.name
+func (t *Task) GetName() string {
+	return t.Name
 }
 
 // IsMemoryOnly: returns memory-only state indicating
 // if this task should ever be saved or read from storage
 func (t *Task) IsMemoryOnly() bool {
 	return t.memoryonly
+}
+
+func (t *Task) Kids() Tasks {
+	return t.kids
 }
 
 // removeTaskFromSlice: worker function to remove from slice
@@ -236,7 +253,7 @@ func (t Task) HasChildren() bool {
 
 func (t Task) FindChild(id string) *Task {
 	for _, curr := range t.kids {
-		if id == curr.Id() {
+		if id == curr.GetId() {
 			return curr
 		}
 	}
@@ -245,7 +262,7 @@ func (t Task) FindChild(id string) *Task {
 
 func (t Task) FindParent(id string) *Task {
 	for _, curr := range t.parents {
-		if id == curr.Id() {
+		if id == curr.GetId() {
 			return curr
 		}
 	}
