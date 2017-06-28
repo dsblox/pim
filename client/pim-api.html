@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PIM API Test Client</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+</head>
+<body>
+    <h1>PIM API Test Client</h1>
+
+
+
+    <div class="container">
+    <!--Row with two equal columns-->
+      <div class="row">
+        <div class="col-sm-6"><!--Column left-->
+        <button type="button" class="btn btn-primary" onclick="loadTasks()">List Tasks</button>
+        <div id="list">
+        </div>
+        </div>
+        <div class="col-sm-6" id="detail"><!--Column right-->
+          <div class="form-group">
+            <label for="detail.name">Task:</label>
+            <input type="text" class="form-control" id="detail.name" aria-describedby="taskHelp" placeholder="Enter task name">
+            <small id="taskHelp" class="form-text text-muted">Short summary name for your task.</small>
+          </div>
+          <div class="form-group">
+            <label for="detail.id">Id:</label>
+            <input type="text" class="form-control" id="detail.id" aria-describedby="taskHelp" placeholder="Task id will appear here" readonly>
+            <small id="taskHelp" class="form-text text-muted">internal unique id of this task</small>
+          </div>
+          <div class="form-group">
+            <label for="detail.state">State:</label>
+            <select class="form-control" id="detail.state">
+              <option value="-1">No State Specified</option>
+              <option value="0">Not Started</option>
+              <option value="1">Complete</option>
+              <option value="2">In Progress</option>
+              <option value="3">On Hold</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="detail.startdate">Start Date:</label>
+            <input type="date" class="form-control" id="detail.startdate">
+          </div>
+          <div class="form-group">
+            <label for="detail.starttime">Start Time:</label>
+            <input type="time" class="form-control" id="detail.starttime">
+          </div>
+          <div class="form-group">
+            <label for="durartion">Estimate (minutes):</label>
+            <input type="number" class="form-control" id="detail.duration">
+          </div>
+          <button type="button" class="btn btn-primary" onclick="createTask()">Create</button>
+          <button type="button" class="btn btn-primary" onclick="replaceTask()">Replace</button>
+          <button type="button" class="btn btn-primary" onclick="updateTask()">Update</button>
+          <button type="button" class="btn btn-primary" onclick="deleteTask()">Delete</button>
+        </div>
+      </div>
+      <h4>Raw Request</h4>
+      <div class="row">
+        <div class="col-sm-1" id="request_directive"></div>
+        <div class="col-sm-4" id="request_url"></div>
+        <div class="col-sm-7" id="request_payload"></div>
+      </div>
+      <h4>Raw Response</h4>
+      <div class="row">
+        <div class="col-sm-1" id="response_code"></div>
+        <div class="col-sm-11" id="raw_response"></div>
+      </div>
+    </div>
+  
+
+<script>
+
+// default date to today
+document.getElementById('detail.startdate').value = new Date().toISOString().split('T')[0];
+
+var baseURL = "https://localhost:4000/";
+var nSecPerMinute = 60000000000;
+
+function makeURL(rest) {
+  return baseURL + rest;
+}
+
+function tasksURL(id = "") {
+  var rest = "tasks";
+  if (id) {
+    rest += "/";
+    rest += id;
+  }
+  return makeURL(rest)
+}
+
+function taskItemHTML(task) {
+  html = '<button class=\"btn btn-link\"';
+  html += ' onclick="loadTask(\'' + task.id + '\')">'
+  html += task.name;
+  html += '</button><br />';
+  return html;
+}
+
+function taskListHTML(tasks) {
+  html = "<ul>";
+  for (i = 0; i < tasks.length; i++) {
+        html += taskItemHTML(tasks[i]);
+  }
+  html += "</ul>";
+  return html;
+}
+
+function ajaxObj() {
+ var xmlhttp;
+  if (window.XMLHttpRequest) {
+    xmlhttp = new XMLHttpRequest();
+  } else {
+    // code for older browsers
+    xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+  }
+  return xmlhttp;  
+}
+
+function ajaxSimple(xmlhttp, url, directive) {
+  document.getElementById("request_directive").innerHTML = directive;
+  document.getElementById("request_url").innerHTML = url;
+  document.getElementById("request_payload").innerHTML = "";
+  xmlhttp.open(directive, url, true);
+  xmlhttp.send();
+}
+
+function ajaxPayload(xmlhttp, url, payload, directive) {
+  json = JSON.stringify(payload);
+  document.getElementById("request_directive").innerHTML = directive;
+  document.getElementById("request_url").innerHTML = url;
+  document.getElementById("request_payload").innerHTML = json;
+  xmlhttp.open(directive, url, true);
+  xmlhttp.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
+  xmlhttp.send(json);
+}
+
+function ajaxGet(xmlhttp, url) {
+  ajaxSimple(xmlhttp, url, "GET");
+}
+
+function ajaxDelete(xmlhttp, url) {
+  ajaxSimple(xmlhttp, url, "DELETE");
+}
+
+function ajaxPost(xmlhttp, url, payload) {
+  ajaxPayload(xmlhttp, url, payload, "POST");
+}
+
+function ajaxPut(xmlhttp, url, payload) {
+  ajaxPayload(xmlhttp, url, payload, "PUT");
+}
+
+function displayRawResponse(status, text) {
+  document.getElementById("raw_response").innerHTML = text;
+  document.getElementById("response_code").innerHTML = status;
+}
+
+function extractTime(datetime) {
+  parts = datetime.split("T");
+  strTime = parts[1];
+  strTime =  strTime.substring(0, strTime.length-1);
+  return strTime;
+}
+
+function extractDate(datetime) {
+  parts = datetime.split("T");
+  strDate = parts[0];
+  return strDate;
+}
+
+
+function formatDateTime(date, time) {
+  return date + "T" + time + ":00Z";
+}
+
+function loadTask(id) {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      displayRawResponse(this.status, this.responseText);
+      if (this.status == 200) {
+        task = JSON.parse(this.responseText);
+        document.getElementById("detail.id").value = task.id;
+        document.getElementById("detail.name").value = task.name;
+        document.getElementById("detail.state").value = task.state;
+        document.getElementById("detail.duration").value = task.estimate / nSecPerMinute;
+
+        // for now ignore the date - extract just the time
+        document.getElementById("detail.starttime").value = extractTime(task.startTime);
+      }
+    }
+  };
+  ajaxGet(ajax, tasksURL(id));
+}
+
+function loadTasks() {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      displayRawResponse(this.status, this.responseText);
+      if (this.status == 200) {
+        tasks = JSON.parse(this.responseText);
+        document.getElementById("list").innerHTML = taskListHTML(tasks);
+      }
+    }
+  };
+  ajaxGet(ajax, tasksURL());
+}
+
+// directives:
+// POST = Create
+// PATCH = Update
+// PUT = Replace
+function writeTask(directive) {
+
+  // collect the task from the form elements
+  var task = {};
+  id = document.getElementById("detail.id").value;
+  task.name = document.getElementById("detail.name").value;
+  task.state = document.getElementById("detail.state").value * 1;
+  task.estimate = document.getElementById("detail.duration").value * nSecPerMinute;
+  task.startTime = formatDateTime(document.getElementById("detail.startdate").value,
+                                  document.getElementById("detail.starttime").value);
+  if (directive != "POST") {
+    task.id = id;
+  }
+  else {
+    id = "";
+  }
+
+  ajax = ajaxObj();
+
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      displayRawResponse(this.status, this.responseText);
+      if (this.status == 200) {
+        // successful - should we do something?
+      }
+    }
+  };
+
+  // a little confusing but it saves a lot of code
+  // wrapper task passes in the right directive and based
+  // on the directive (POST, PUT, PATCH) we've set up
+  // the id to be valid or not to bulid the right URL
+  ajaxPayload(ajax, tasksURL(id), task, directive);
+}
+
+function createTask() {
+  writeTask("POST"); // POST means create
+}
+function replaceTask() {
+  writeTask("PUT"); // PUT means replace
+}
+function updateTask() {
+  // this isn't working yet - if a field has not been changed it should
+  // not even be included in the JSON that gets sent to the server.  We
+  // need to add "dirty flags" to our form fields and only send the dirty
+  // info if we want to properly test this.
+  writeTask("PATCH"); // PATCH means update
+}
+
+function deleteTask() {
+  id = document.getElementById("detail.id").value;
+  ajax = ajaxObj();
+
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      displayRawResponse(this.status, this.responseText);
+      if (this.status == 200) {
+        // successful - should we do something?
+      }
+    }
+  };
+
+  ajaxDelete(ajax, tasksURL(id));
+}
+
+
+</script>
+
+</body>
+</html>

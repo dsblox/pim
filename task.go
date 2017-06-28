@@ -3,6 +3,7 @@ package main
 import "fmt"
 import "errors"
 import "github.com/satori/go.uuid"
+import "time"
 
 
 // didn't understand error types as values before - will rework
@@ -43,7 +44,10 @@ type TaskDataMapper interface {
 type Task struct {
 	Id string  `json:"id"`        // unique id of the task - TBD make this pass through to mapper!!!
 	Name string `json:"name"`     // name of the task
-	State TaskState `json:state"` // state of the task
+	State TaskState `json:"state"` // state of the task
+	StartTime time.Time `json:"startTime"` // start time of the task
+	Estimate time.Duration `json:"estimate"` // estimated duration of the task
+
 	parents []*Task      // list of parent tasks (we support many parents)
 	kids []*Task         // list of child tasks
 
@@ -190,6 +194,19 @@ func (t *Task) SetName(newName string) {
 // Name: returns the name field
 func (t *Task) GetName() string {
 	return t.Name
+}
+
+func (t *Task) SetStartTime(start time.Time) {
+	t.StartTime = start;
+}
+func (t *Task) GetStartTime() time.Time {
+	return t.StartTime;
+}
+func (t *Task) SetEstimate(estimate time.Duration) {
+	t.Estimate = estimate;
+}
+func (t *Task) GetEstimate() time.Duration {
+	return t.Estimate;
 }
 
 // IsMemoryOnly: returns memory-only state indicating

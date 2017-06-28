@@ -8,6 +8,7 @@ import (
 	"log"
 	"flag"
 	"net/http"
+	"time"
 )
 
 import (
@@ -30,9 +31,11 @@ const (
 	resetTask
 	holdTask
 	renameTask
+	setStartTime
+	setEstimate
 	debugTask
 )
-var cmdChars = []rune{ '?', 'q', 'p', 'a', 'x', 'u', 'd', 'c', 's', 'r', 'h', 'n', '~'}
+var cmdChars = []rune{ '?', 'q', 'p', 'a', 'x', 'u', 'd', 'c', 's', 'r', 'h', 'n', 't', 'e', '~'}
 
 // findCommand: given an entered rune will look up the command to execute
 func findCommand(entered rune) int {
@@ -57,6 +60,8 @@ func printHelp() {
 	fmt.Println("  s = start current task")
 	fmt.Println("  r = reset current task to not started")
 	fmt.Println("  h = put current task on hold")
+	fmt.Println("  t = set start time for current task")
+	fmt.Println("  e = set estimated duration of current task")
 	fmt.Println("  ~ = debug by dumping all info on current task")
 	fmt.Println("  ? = help")
 	fmt.Println("  q = quit")
@@ -212,10 +217,40 @@ func runConsoleApp() {
 			case holdTask:
 				currentTask.SetState(onHold)
 
+			case setStartTime:
+				fmt.Print("Enter start date and time (MM/DD/YYYY HH:MMam/pm): ")
+				strTime, _ := reader.ReadString('\n')
+				strTime = strings.TrimSpace(strTime)
+				startTime, err := time.Parse("1/2/2006 3:04pm", strTime)
+				if (err == nil) {
+					// fmt.Printf("startTime = %s\n", startTime)
+					// for now the date is always today
+					//y, m, d := time.Now().Date()
+					//h := startTime.Hour()
+					//m := startTime.Minute()
+					//fullStartTime := time.Date(y, m, d, h, m, 0, 0, nil)
+					currentTask.SetStartTime(startTime)	
+				} else {
+					fmt.Printf("err = %s\n", err)
+				}
+				
+			case setEstimate:
+				fmt.Print("Enter estimate (e.g. 45m or 1h30m): ")
+				strEstimate, _ := reader.ReadString('\n')
+				strEstimate = strings.TrimSpace(strEstimate)
+				estimate, err := time.ParseDuration(strEstimate)
+				if (err == nil) {
+					currentTask.SetEstimate(estimate)
+				} else {
+					fmt.Printf("err = %s\n", err)					
+				}
+
 			case debugTask:
 				fmt.Printf("name = %s\n", currentTask.GetName())
 				fmt.Printf("id = %s\n", currentTask.GetId())
 				fmt.Printf("state = %s\n", currentTask.GetState())
+				fmt.Printf("startTime = %s\n", currentTask.GetStartTime())
+				fmt.Printf("estimate = %s\n", currentTask.GetEstimate())
 		}
 
 		// most commands want us to reprint the entire list in

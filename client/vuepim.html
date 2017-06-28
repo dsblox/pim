@@ -9,10 +9,12 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 
-<script src="https://unpkg.com/vue@next/dist/vue.js"></script>
+<script src="https://unpkg.com/vue"></script>
 <script src="https://unpkg.com/axios@0.12.0/dist/axios.min.js"></script>
 <script src="https://unpkg.com/lodash@4.13.1/lodash.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-strap/1.1.29/vue-strap.min.js"></script>
+
+<script src="pim-ajax.js"></script>
 
 </head>
 
@@ -80,6 +82,10 @@
             <small id="taskHelp" class="form-text text-muted">Short summary name for your task.</small>
           </div>
           <div class="form-group">
+            <label for="startdate">Start Date:</label>
+            <input type="date" class="form-control" id="startdate">
+          </div>
+          <div class="form-group">
             <label for="starttime">Start Time:</label>
             <input type="time" class="form-control" id="starttime">
           </div>
@@ -101,6 +107,8 @@
 
 <script>
 
+var nSecPerMinute = 60000000000;
+
 
 // create our basic task view model
 class Task {
@@ -109,7 +117,11 @@ class Task {
     this.name = name;           // name of the task
     this.startTime = startTime; // start time or date
     this.estimate = estimate;   // in minutes
-    this.complete = complete;   // true if the task is done
+    this.complete = complete;   // true if the task is done - OBSOLETE
+  }
+
+  isComplete() {
+    return (this.state == Task.states.COMPLETE);
   }
 
   // return the esimtate as a number even if null
@@ -314,17 +326,19 @@ function upsertTask() {
 	var t = null;
 	var f = document.getElementById("newTask");
 	var name = f.elements["task"].value;
+  var strdate = f.elements["startdate"].value;
 	var strtime = f.elements["starttime"].value;
 	var time = null;
-	if (strtime.length > 0) {
-	  	time = new Date("January 1, 2000 " + strtime);
+	if ((strtime.length > 0) && (strdate.length > 0)) {
+	  	time = new Date(strdate + " " + strtime);
 	}
 	var duration = parseInt(f.elements["duration"].value);
 	if (isNaN(duration)) {
 		duration = null;
 	}
 	if (currTask == null) {
-		t = new Task(guid(), name, time, duration, false);
+		t = new Task(null, name, time, duration, false);
+    writeTask(t, "POST"); // create a new task on the server
 		var list = stuff;
 		var sort = false;
 		if (time != null) {
@@ -339,6 +353,7 @@ function upsertTask() {
 		t.estimate = duration;
 		moveTask(t);
 		currTask = null;
+    writeTask(t,"PUT"); // update the task that changed
 	}
 }
 
@@ -351,6 +366,9 @@ function deleteTask() {
 	done.removeTask(currTask);
 	stuff.removeTask(currTask);
 	scheduled.removeTask(currTask);
+
+  // delete the task from the server (when we write it)
+  // killTask(currTask);
 
 	// remove what we hope is the last reference to the task
 	currTask = null;
@@ -447,7 +465,7 @@ Vue.component('pim-task-list', {
                 <span v-if="this.taskList.duration()" class="badge pull-right" >{{this.taskList.durationFormatted()}}</span></h4> \
                </div> \
                <div class="list-group">\
-                  <template v-for="task in taskList.tasks">\
+                <template v-for="task in taskList.tasks">\
                  <pim-task :task="task" class=list-group-item v-on:toggle="toggle" /> \
                </template> \
               </div> \
@@ -500,6 +518,18 @@ function extractTimeString(timestamp) {
 	return hrstr + ":" + mnstr + ":" + '00';
 }
 
+function extractDateString(timestamp) {
+  parts = timestamp.toISOString().split("T");
+  strDate = parts[0];
+  return strDate;  
+}
+
+function stringToDate(strDate) {
+  console.log(strDate);
+  console.log(Date.parse(strDate.substring(0,strDate.length-1)));
+  return new Date(strDate.substring(0,strDate.length-1));
+}
+
 // handle the DISPLAY of the New/Edit Modal Dialog
 // we did all this list to track which list to ad to, then realized
 // we'd prefer to use whether or not the user entered a time to
@@ -511,7 +541,6 @@ $('#myModal').on('show.bs.modal', function (event) {
 	// find any data the invocation is trying to send us
   	var button = $(event.relatedTarget) // Button that triggered the modal
   	currList = taskListFromID(button.data('list')) // Extract info from data-* attributes
-  	console.log(button.data('taskid'))
   	currTask = findTask(button.data('taskid'))
 
   	// initialize or clear the modal's form fields
@@ -520,6 +549,7 @@ $('#myModal').on('show.bs.modal', function (event) {
   	if (currTask != null) {
   		title = "Edit Task: " + currTask.name
   		f.elements["task"].value = currTask.name;
+      f.elements["startdate"].value = extractDateString(currTask.startTime);
   		f.elements["starttime"].value = extractTimeString(currTask.startTime);
   		f.elements["duration"].value = currTask.estimate;  	
   		f.elements["delete"].style.visibility = 'visible';
@@ -527,7 +557,8 @@ $('#myModal').on('show.bs.modal', function (event) {
   	} else {
   		title = "Create New Task";
   		f.elements["task"].value = null;
-  		f.elements["starttime"].value = null;
+  		f.elements["startdate"].value = new Date().toISOString().split('T')[0];
+      f.elements["starttime"].value = null;
   		f.elements["duration"].value = null;
   		f.elements["delete"].style.visibility = 'hidden';  	
   	}
@@ -537,6 +568,87 @@ $('#myModal').on('show.bs.modal', function (event) {
   	modal.find('.modal-title').text(title)
 })
 
+// the ajax calls will initially load tasks into these lists
+// depending on the attributes on the tasks
+var scheduled = new TaskList();
+var stuff = new TaskList();
+var done = new TaskList();
+
+// call the server to create a new task
+function writeTask(task, directive) {
+
+  // collect the task from the form elements
+  var id = "";
+  if (directive == "POST") {
+    if (task.id != null || task.id == "") {
+      console.log("error: id should be null on create.  aborting create.");
+      return;
+    }
+  }
+  else {
+    if (task.id == null || task.id.length == 0) {
+      console.log("error: id must be specified on update.  aborting update.");
+      return;
+    }
+    id = task.id;
+  }
+
+  ajax = ajaxObj();
+
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        console.log("success: task created or updated")
+        serverTask = JSON.parse(this.responseText);
+        task.id = serverTask.id;
+      }
+    }
+  };
+  // a little confusing but it saves a lot of code
+  // wrapper task passes in the right directive and based
+  // on the directive (POST, PUT, PATCH) we've set up
+  // the id to be valid or not to build the right URL
+  ajaxPayload(ajax, tasksURL(id), task, directive);
+}
+
+
+// call the server to get our initial list of tasks
+function loadTasks() {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        tasks = JSON.parse(this.responseText);
+
+        for (i = 0; i < tasks.length; i++) {
+            task = tasks[i];
+            t = new Task(task.id, 
+                         task.name, 
+                         null, // stringToDate(task.startTime), 
+                         task.estimate/nSecPerMinute);
+            t.complete = (task.state == 1);
+            t.startTime = stringToDate(task.startTime);
+            if (t.complete) {
+              done.insertTask(t);
+            }
+            else {
+              if (t.startTime == null) {
+                stuff.insertTask(t);
+              }
+              else {
+                scheduled.insertTask(t);
+              }
+            }
+        }
+      }
+    }
+  };
+  ajaxGet(ajax, tasksURL());
+}
+
+loadTasks();
+
+/*
 // set up our test data - eventually these will come from the server
 var testTask1 = new Task(1, 'Learn JavaScript', null, 90, false);
 var testTask2 = new Task(2, 'Learn Vue', null, 15, false);
@@ -548,25 +660,23 @@ var schedule2 = new Task(102, 'Kim 1:1', new Date("January 1, 2000 09:30:00"), 3
 var schedule3 = new Task(103, 'Marcus 1:1', new Date("January 1, 2000 10:00:00"), 30, false)
 
 // group my tasks into three arrays for separate display
-var scheduled = new TaskList();
 scheduled.setTitle("Calendar");
 scheduled.setId("C");
 scheduled.insertTask(schedule1, 'timesort');
 scheduled.insertTask(schedule2, 'timesort');
 scheduled.insertTask(schedule3, 'timesort');
 
-var stuff = new TaskList();
 stuff.setTitle("Stuff");
 stuff.setId("S");
 stuff.insertTask(testTask1);
 stuff.insertTask(testTask2);
 stuff.insertTask(testTask3);
 
-var done = new TaskList();
 done.setTitle("Done");
 done.setId("D");
 done.insertTask(testTask4);
 done.insertTask(testTask5);
+*/
 
 function taskListFromID(id) {
 	var result = null;

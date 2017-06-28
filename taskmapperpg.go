@@ -5,6 +5,8 @@ import "errors"
 import "log"
 import "os"
 import "database/sql"
+import "time"
+import "github.com/lib/pq"
 
 const (
     DB_USER     = "postgres"
@@ -152,8 +154,10 @@ func NewTaskDataMapperPostgreSQL(saved bool) *TaskDataMapperPostgreSQL {
 	        	         id CHAR(36) PRIMARY KEY,
 	            	     name VARCHAR(1024) NOT NULL,
 	                	 state INT NOT NULL,
-		                 created_at DATE,
-		                 modified_at DATE)`)
+	                	 start_time TIMESTAMP,
+	                	 estimate_minutes INT,
+		                 created_at TIMESTAMP,
+		                 modified_at TIMESTAMP)`)
 			if dberr != nil {
 				fmt.Printf(" CREATE TABLE TASKS failed: %s\n", dberr)
 				return nil
@@ -161,8 +165,8 @@ func NewTaskDataMapperPostgreSQL(saved bool) *TaskDataMapperPostgreSQL {
    			_, dberr = dbExec(env, `CREATE TABLE task_parents (
 						parent_id CHAR(36) NOT NULL,
 						child_id CHAR(36) NOT NULL,
-						created_at DATE,
-						modified_at DATE,
+						created_at TIMESTAMP,
+						modified_at TIMESTAMP,
 						CONSTRAINT pk_parents PRIMARY KEY (parent_id,child_id),
 						FOREIGN KEY (parent_id) REFERENCES tasks(id),
 						FOREIGN KEY (child_id) REFERENCES tasks(id) )`)
@@ -196,13 +200,15 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 
 		// upsert the task itself
 		if tm.loaded {
-			_, err := dbExec(env, "UPDATE tasks SET name = $1, state = $2 WHERE ID = $3", t.Name, t.State, t.Id)
+			_, err := dbExec(env, `UPDATE tasks SET name = $1, state = $2, start_time = $3, estimate_minutes = $4  
+				                   WHERE ID = $5`, t.Name, t.State, t.StartTime, int(t.Estimate.Minutes()), t.Id)
 			if (err != nil) {
 				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to update task %s: %s", t.Name, err))
 				return err
 			}
 		} else {
-	    	_, err := dbExec(env, `INSERT INTO tasks (id, name, state) VALUES ($1, $2, $3) RETURNING id`, t.Id, t.Name, t.State)
+	    	_, err := dbExec(env, `INSERT INTO tasks (id, name, state, start_time, estimate_minutes) VALUES ($1, $2, $3, $4, $5) RETURNING id`, 
+	    		             t.Id, t.Name, t.State, t.StartTime, int(t.Estimate.Minutes()))
 			if (err != nil)	{ 
 				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert task %s: %s", t.Name, err))
 				return err
@@ -286,6 +292,26 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 	return nil
 }
 
+func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task, 
+												 db_start_time pq.NullTime,
+												 db_estimate_minutes sql.NullInt64) error {
+	// go is terrible dealing with null values from databases
+	// must use this intervening struct to track if null or not
+	db_value_start_time, _ := db_start_time.Value()
+	if (db_value_start_time != nil) {
+		start_time := db_value_start_time.(time.Time)
+		t.SetStartTime(start_time)
+	}
+
+	db_value_estimate_minutes, _ := db_estimate_minutes.Value()
+	if (db_value_estimate_minutes != nil) {
+		estimate_minutes := db_value_estimate_minutes.(int64)
+		t.SetEstimate(time.Duration(estimate_minutes) * time.Minute)
+	}
+
+	return nil	
+}
+
 /*
 =============================================================================
  Load()
@@ -327,6 +353,8 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 	var (
 		name string
 		state TaskState
+		db_start_time pq.NullTime
+		db_estimate_minutes sql.NullInt64
 	)
 
 	// if we're told this is "root" that means we should not attempt
@@ -334,8 +362,8 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 	if (!root) {
 
 		// build and execute the query for the task
-		taskQuery := "SELECT name, state FROM tasks WHERE id = '" + t.GetId() + "'"
-		err := env.db.QueryRow(taskQuery).Scan(&name, &state)
+		taskQuery := "SELECT name, state, start_time, estimate_minutes FROM tasks WHERE id = '" + t.GetId() + "'"
+		err := env.db.QueryRow(taskQuery).Scan(&name, &state, &db_start_time, &db_estimate_minutes)
 		if err != nil {
 			// log.Printf("query for a task failed: %s, err: %s\n", taskQuery, err)
 			return err
@@ -344,6 +372,22 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 		// overwrite my in-memory values
 		t.SetName(name)
 		t.SetState(state)
+		tm.setTaskFields(t, db_start_time, db_estimate_minutes)
+
+		// go is terrible dealing with null values from databases
+		// must use this intervening struct to track if null or not
+		/*
+		db_value_start_time, _ := db_start_time.Value()
+		if (db_value_start_time != nil) {
+			start_time := db_value_start_time.(time.Time)
+			t.SetStartTime(start_time)
+		}
+
+		db_value_estimate_minutes, _ := db_estimate_minutes.Value()
+		if (db_value_estimate_minutes != nil) {
+			estimate_minutes := db_value_estimate_minutes.(int64)
+			t.SetEstimate(time.Duration(estimate_minutes) * time.Minute)
+		} */
 
 		// set myself as loaded from the DB
 		tm.loaded = true
@@ -366,9 +410,11 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 		id string
 		name string
 		state TaskState
+		db_start_time pq.NullTime
+		db_estimate_minutes sql.NullInt64
 	)
 
-	var baseQuery string = `SELECT t.id, t.name, t.state FROM tasks t
+	var baseQuery string = `SELECT t.id, t.name, t.state, t.start_time, t.estimate_minutes FROM tasks t
 		                       LEFT JOIN task_parents tp ON tp.child_id = t.id
 		                       WHERE tp.parent_id %s`
 
@@ -390,7 +436,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 
 	// for each child task in the DB
 	for rows.Next() {
-		err := rows.Scan(&id, &name, &state)
+		err := rows.Scan(&id, &name, &state, &db_start_time, &db_estimate_minutes)
 		if err != nil {
 			log.Printf("row scan failed\n")
 			log.Fatal(err)
@@ -399,6 +445,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 
 		// create the child task
 		k := &Task{Id:id, Name:name, State:state}
+		tm.setTaskFields(k, db_start_time, db_estimate_minutes)
 
 		// set the data mapper onto the child indicating that it was loaded from DB
 		kdm := NewTaskDataMapperPostgreSQL(true)

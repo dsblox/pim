@@ -13,7 +13,6 @@ type Route struct {
 
 type Routes []Route
 
-// tbd - DELETE
 var routes = Routes{
     Route{
         "TaskIndex",
@@ -32,5 +31,23 @@ var routes = Routes{
         "POST",
         "/tasks",
         TaskCreate,
+    },
+    Route{
+        "TaskReplace",
+        "PUT",
+        "/tasks/{taskId}",
+        TaskReplace,
+    },
+    Route{
+        "TaskUpdate",
+        "PATCH",
+        "/tasks/{taskId}",
+        TaskReplace,
+    },
+    Route{
+        "TaskDelete",
+        "DELETE",
+        "/tasks/{taskId}",
+        TaskDelete,
     },
 }
