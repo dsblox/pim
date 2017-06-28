@@ -1,4 +1,4 @@
-FROM golang:1.6
+FROM golang:1.8
 
 # download the pim, build it and install it
 RUN go get github.com/dsblox/pim/... #force by changing this number 7
