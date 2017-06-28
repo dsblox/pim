@@ -300,7 +300,7 @@ func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task,
 	db_value_start_time, _ := db_start_time.Value()
 	if (db_value_start_time != nil) {
 		start_time := db_value_start_time.(time.Time)
-		t.SetStartTime(start_time)
+		t.SetStartTime(&start_time)
 	}
 
 	db_value_estimate_minutes, _ := db_estimate_minutes.Value()

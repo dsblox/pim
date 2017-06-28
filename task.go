@@ -45,7 +45,7 @@ type Task struct {
 	Id string  `json:"id"`        // unique id of the task - TBD make this pass through to mapper!!!
 	Name string `json:"name"`     // name of the task
 	State TaskState `json:"state"` // state of the task
-	StartTime time.Time `json:"startTime"` // start time of the task
+	StartTime *time.Time `json:"startTime,omitempty"` // start time of the task
 	Estimate time.Duration `json:"estimate"` // estimated duration of the task
 
 	parents []*Task      // list of parent tasks (we support many parents)
@@ -196,10 +196,10 @@ func (t *Task) GetName() string {
 	return t.Name
 }
 
-func (t *Task) SetStartTime(start time.Time) {
+func (t *Task) SetStartTime(start *time.Time) {
 	t.StartTime = start;
 }
-func (t *Task) GetStartTime() time.Time {
+func (t *Task) GetStartTime() *time.Time {
 	return t.StartTime;
 }
 func (t *Task) SetEstimate(estimate time.Duration) {

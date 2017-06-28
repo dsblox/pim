@@ -229,7 +229,7 @@ func runConsoleApp() {
 					//h := startTime.Hour()
 					//m := startTime.Minute()
 					//fullStartTime := time.Date(y, m, d, h, m, 0, 0, nil)
-					currentTask.SetStartTime(startTime)	
+					currentTask.SetStartTime(&startTime)	
 				} else {
 					fmt.Printf("err = %s\n", err)
 				}

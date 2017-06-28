@@ -70,6 +70,7 @@ func taskRead(w http.ResponseWriter, r *http.Request) *Task {
     }
     if err := json.Unmarshal(body, &task); err != nil {
         errorResponse(w, pimErr(badRequest))
+        fmt.Println(err)
         return nil
     }
 

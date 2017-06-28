@@ -415,6 +415,7 @@ Vue.component('pim-task', {
   props: ['task'],
   methods: {
     toggle: function() {
+      console.log("pim-task toggle: emitting toggle event");
       this.$emit('toggle', this.task);
     }
   },
@@ -449,6 +450,8 @@ Vue.component('pim-task-list', {
   },
   methods: {
     toggle: function(task) {
+      // toggleTask(task);
+      console.log("pim-task-list toggle: emitting toggle event");
       this.$emit('toggle', task);
     },
 
@@ -519,14 +522,20 @@ function extractTimeString(timestamp) {
 }
 
 function extractDateString(timestamp) {
+  if (timestamp == null) {
+    return null;
+  }
   parts = timestamp.toISOString().split("T");
   strDate = parts[0];
   return strDate;  
 }
 
 function stringToDate(strDate) {
-  console.log(strDate);
-  console.log(Date.parse(strDate.substring(0,strDate.length-1)));
+  if (strDate == null) {
+    return null;
+  }
+  // console.log(strDate);
+  // console.log(Date.parse(strDate.substring(0,strDate.length-1)));
   return new Date(strDate.substring(0,strDate.length-1));
 }
 
@@ -636,7 +645,7 @@ function loadTasks() {
                 stuff.insertTask(t);
               }
               else {
-                scheduled.insertTask(t);
+                scheduled.insertTask(t, 'timesort');
               }
             }
         }
@@ -725,9 +734,14 @@ function moveTask(task) {
 
 function toggleTask(task) {
  	if (task == null) { return; }
- 	task.complete = !task.complete;
- 	moveTask(task);
 
+  // note this used to be necessary - but now it isn't
+  // i think vue fixed a bug in the data binding and is
+  // now automatically changing the task value when it
+  // didn't before
+  // task.complete = !task.complete;
+
+ 	moveTask(task);
 }
 
 
