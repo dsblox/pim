@@ -128,7 +128,9 @@ func TaskReplace(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println(task.GetEstimate())
+    // fmt.Println(task.GetEstimate())
+    fmt.Println("Task as received from client...")
+    fmt.Println(task)
 
 
     // replace all fields of the current task from the request
