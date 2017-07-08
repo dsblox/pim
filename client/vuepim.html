@@ -153,15 +153,8 @@ $('#myModal').on('show.bs.modal', function (event) {
   	modal.find('.modal-title').text(title)
 })
 
-// the ajax calls will initially load tasks into these lists
-// depending on the attributes on the tasks
-var scheduled = new TaskList();
-var stuff = new TaskList();
-var done = new TaskList();
-
 // call the server to get tasks and put into the lists
 loadTasks();
-
 
 // here is a root Vue to hold references to my models
 // the data references can be linked to components

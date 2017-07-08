@@ -115,6 +115,14 @@ func (t Task) stateChar() string {
 	return string(stateChars[t.State])
 }
 
+func RenderTime(t* time.Time) string {
+  if t != nil {
+  	return t.Format("20060102-15:04:05.000")
+  } else {
+  	return ""
+  }
+}
+
 // StringSingle: display an individual task indented to the requested level
 // and highlighting the current task with an "*" 
 func (t Task) StringSingle(level int) string {
@@ -130,7 +138,7 @@ func (t Task) StringSingle(level int) string {
 	} else {
 		s += " "
 	}
-	s += fmt.Sprintf("[%v] %v (%d sub-tasks)", t.stateChar(), t.Name, len(t.kids))
+	s += fmt.Sprintf("[%v] <%v> %v <%d> (%d sub-tasks)", t.stateChar(), RenderTime(t.StartTime), t.Name, t.Estimate, len(t.kids))
 	return s
 }
 

@@ -47,7 +47,7 @@ class Task {
   // concise format if over an hour or not provided
   // at all.
   static formatMinutes(minutes) {
-    if (minutes == null) {
+    if (minutes == null || minutes == 0) {
       return "";
     }
     else if (minutes <= 60) {

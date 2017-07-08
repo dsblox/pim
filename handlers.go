@@ -88,7 +88,7 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
     t := NewTask(task.GetName())
     t.SetState(task.GetState())
     t.SetStartTime(task.GetStartTime())
-    t.SetEstimate(task.GetEstimate())
+    t.SetEstimate(task.GetEstimate() * time.Minute)
     master.AddChild(t)
     t.Save(true)
 

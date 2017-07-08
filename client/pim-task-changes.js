@@ -8,19 +8,22 @@ function upsertTask() {
 	var t = null;
 	var f = document.getElementById("newTask");
 	var name = f.elements["task"].value;
-  var strdate = f.elements["startdate"].value;
+    var strdate = f.elements["startdate"].value;
 	var strtime = f.elements["starttime"].value;
 	var time = null;
 	if ((strtime.length > 0) && (strdate.length > 0)) {
+		// remember time will be sent in local time zone
+		// with TZ info and will be stored in GMT
 	  	time = new Date(strdate + " " + strtime);
 	}
+	console.log("upsert: time = " + time);
 	var duration = parseInt(f.elements["duration"].value);
 	if (isNaN(duration)) {
 		duration = null;
 	}
 	if (currTask == null) {
 		t = new Task(null, name, time, duration, false);
-    createTask(t); // create a new task on the server
+    	createTask(t); // create a new task on the server
 		var list = stuff;
 		var sort = false;
 		if (time != null) {
@@ -31,11 +34,11 @@ function upsertTask() {
 	} else {
 		t = currTask;
 		t.name = name;
-		t.startTime = time; // TBD: not working?
+		t.startTime = time;
 		t.estimate = duration;
 		moveTask(t);
 		currTask = null;
-    updateTask(t); // update the task that changed
+    	updateTask(t); // update the task that changed
 	}
 }
 
@@ -125,7 +128,13 @@ function stringToDate(strDate) {
   }
   // console.log(strDate);
   // console.log(Date.parse(strDate.substring(0,strDate.length-1)));
-  return new Date(strDate.substring(0,strDate.length-1));
+  date = new Date(strDate.substring(0,strDate.length-1));
+  if (strDate.slice(-1) == "Z") { // Z as last char means UTC
+	var offset = new Date().getTimezoneOffset();
+  	date.setMinutes(date.getMinutes() - offset);
+  }	
+
+  return date;
 }
 
 
