@@ -28,7 +28,7 @@ function killTask(task) {
 
 // call the server to create a new task or update an existing one
 // pass in a task with a null id to create a new task on the server
-// or one with an  id to update an existing task on the server
+// or one with an id to update an existing task on the server
 function writeTask(task, directive) {
 
   // collect the task from the form elements

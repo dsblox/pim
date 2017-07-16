@@ -4,6 +4,7 @@ var scheduled = new TaskList();
 var stuff = new TaskList();
 var done = new TaskList();
 
+
 function upsertTask() {
 	var t = null;
 	var f = document.getElementById("newTask");
@@ -16,7 +17,6 @@ function upsertTask() {
 		// with TZ info and will be stored in GMT
 	  	time = new Date(strdate + " " + strtime);
 	}
-	console.log("upsert: time = " + time);
 	var duration = parseInt(f.elements["duration"].value);
 	if (isNaN(duration)) {
 		duration = null;
@@ -117,8 +117,14 @@ function extractDateString(timestamp) {
   if (timestamp == null) {
     return null;
   }
-  parts = timestamp.toISOString().split("T");
-  strDate = parts[0];
+  try {
+  	parts = timestamp.toISOString().split("T");
+  	strDate = parts[0];
+  }
+  catch (err) {
+  	console.log("invalid date: " + err);
+  	strDate = null;
+  }
   return strDate;  
 }
 
@@ -126,8 +132,6 @@ function stringToDate(strDate) {
   if (strDate == null) {
     return null;
   }
-  // console.log(strDate);
-  // console.log(Date.parse(strDate.substring(0,strDate.length-1)));
   date = new Date(strDate.substring(0,strDate.length-1));
   if (strDate.slice(-1) == "Z") { // Z as last char means UTC
 	var offset = new Date().getTimezoneOffset();
