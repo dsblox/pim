@@ -95,15 +95,15 @@ function loadTasks() {
             task = tasks[i];
             t = new Task(task.id, 
                          task.name, 
-                         null, // stringToDate(task.startTime), 
+                         null, // stringToDate(task.getTargetStartTime()), 
                          task.estimate/nSecPerMinute);
             t.state = task.state; // see mapping in TaskState enum
-            t.startTime = stringToDate(task.startTime);
+            t.setTargetStartTime(stringToDate(task.targetStartTime));
             if (t.isComplete()) {
               done.insertTask(t);
             }
             else {
-              if (t.startTime == null) {
+              if (t.getTargetStartTime() == null) {
                 stuff.insertTask(t);
               }
               else {

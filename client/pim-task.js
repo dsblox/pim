@@ -23,10 +23,18 @@ class Task {
   constructor(id, name, startTime, estimate, complete) {
     this.id = id;               // id of the task on the server
     this.name = name;           // name of the task
-    this.startTime = startTime; // start time or date
+    this.targetStartTime = startTime; // start time or date
     this.estimate = estimate;   // in minutes
     this.state = (complete?TaskState.COMPLETE:TaskState.NOT_STARTED);
     // this.complete = complete;   // true if the task is done - OBSOLETE
+  }
+
+  getName() {
+    return this.name;
+  }
+
+  setName(newName) {
+    this.name = newName;
   }
 
   isComplete() {
@@ -38,9 +46,21 @@ class Task {
     return (isNaN(this.estimate) ? 0 : this.estimate);
   }
 
+  setEstimate(e) {
+    this.estimate = e;
+  }
+
   // return true if we have a start time on this task
   hasStartTime() {
-    return (this.startTime != null); // should check type?  typescript?
+    return (this.getTargetStartTime() != null); // should check type?  typescript?
+  }
+
+  getTargetStartTime() {
+    return this.targetStartTime;
+  }
+
+  setTargetStartTime(newTime) {
+    this.targetStartTime = newTime;
   }
 
   // utility function to convert minutes to a more
@@ -87,16 +107,16 @@ class Task {
 
   // return the estimated minutes in readable format
   estimateString() {
-    return Task.formatMinutes(this.estimate);
+    return Task.formatMinutes(this.getEstimate());
   }
 
   // return start time as formated string of just the time
   startTimeString() {
-    if (this.startTime == null) {
+    if (this.getTargetStartTime() == null) {
       return "";
     }
     else {
-      return Task.formatTime(this.startTime) + ' - ';
+      return Task.formatTime(this.getTargetStartTime()) + ' - ';
     }
   }
 

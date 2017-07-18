@@ -141,8 +141,8 @@ $('#myModal').on('show.bs.modal', function (event) {
   	if (currTask != null) {
   		title = "Edit Task: " + currTask.name
   		f.elements["task"].value = currTask.name;
-      f.elements["startdate"].value = extractDateString(currTask.startTime);
-  		f.elements["starttime"].value = extractTimeString(currTask.startTime);
+      f.elements["startdate"].value = extractDateString(currTask.getTargetStartTime());
+  		f.elements["starttime"].value = extractTimeString(currTask.getTargetStartTime());
   		f.elements["duration"].value = currTask.estimate;  	
   		f.elements["delete"].style.visibility = 'visible';
 

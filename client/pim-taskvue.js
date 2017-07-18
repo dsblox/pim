@@ -33,7 +33,7 @@ Vue.component('pim-task', {
                 	   v-bind:true-value=1 v-bind:false-value=0 \
                      v-on:click="toggle"> \
               	<pim-start-time :task="task"></pim-start-time> \
-              	<pim-task-name :name="task.name" :id="task.id"></pim-task-name> \
+              	<pim-task-name :name="task.getName()" :id="task.id"></pim-task-name> \
               </label> \
               <pim-task-estimate :estimate="task.estimateString()"></pim-task-estimate> \
             </div>'

@@ -46,7 +46,9 @@ type Task struct {
 	Id string  `json:"id"`        // unique id of the task - TBD make this pass through to mapper!!!
 	Name string `json:"name"`     // name of the task
 	State TaskState `json:"state"` // state of the task
-	StartTime *time.Time `json:"startTime,omitempty"` // start time of the task
+	TargetStartTime *time.Time `json:"targetStartTime,omitempty"` // targeted start time of the task
+	ActualStartTime *time.Time `json:"actualStartTime,omitempty"` // actual start time of the task
+	ActualCompletionTime *time.Time `json:"actualCompletionTime,omitempty"` // time task is marked done
 	Estimate time.Duration `json:"estimate"` // estimated duration of the task
 
 	parents []*Task      // list of parent tasks (we support many parents)
@@ -139,7 +141,7 @@ func (t Task) StringSingle(level int) string {
 	} else {
 		s += " "
 	}
-	s += fmt.Sprintf("[%v] <%v> %v <%d> (%d sub-tasks)", t.stateChar(), RenderTime(t.StartTime), t.Name, t.Estimate, len(t.kids))
+	s += fmt.Sprintf("[%v] <%v> %v <%d> (%d sub-tasks)", t.stateChar(), RenderTime(t.TargetStartTime), t.Name, t.Estimate, len(t.kids))
 	return s
 }
 
@@ -205,11 +207,23 @@ func (t *Task) GetName() string {
 	return t.Name
 }
 
-func (t *Task) SetStartTime(start *time.Time) {
-	t.StartTime = start;
+func (t *Task) SetTargetStartTime(start *time.Time) {
+	t.TargetStartTime = start;
 }
-func (t *Task) GetStartTime() *time.Time {
-	return t.StartTime;
+func (t *Task) GetTargetStartTime() *time.Time {
+	return t.TargetStartTime;
+}
+func (t *Task) SetActualStartTime(start *time.Time) {
+	t.ActualStartTime = start;
+}
+func (t *Task) GetActualStartTime() *time.Time {
+	return t.ActualStartTime;
+}
+func (t *Task) SetActualCompletionTime(done *time.Time) {
+	t.ActualCompletionTime = done;
+}
+func (t *Task) GetActualCompletionTime() *time.Time {
+	return t.ActualCompletionTime;
 }
 func (t *Task) SetEstimate(estimate time.Duration) {
 	t.Estimate = estimate;

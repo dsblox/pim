@@ -194,7 +194,7 @@ function loadTask(id) {
         document.getElementById("detail.duration").value = task.estimate / nSecPerMinute;
 
         // for now ignore the date - extract just the time
-        document.getElementById("detail.starttime").value = extractTime(task.startTime);
+        document.getElementById("detail.starttime").value = extractTime(task.targetStartTime);
       }
     }
   };
@@ -227,7 +227,7 @@ function writeTask(directive) {
   task.name = document.getElementById("detail.name").value;
   task.state = document.getElementById("detail.state").value * 1;
   task.estimate = document.getElementById("detail.duration").value * nSecPerMinute;
-  task.startTime = formatDateTime(document.getElementById("detail.startdate").value,
+  task.targetStartTime = formatDateTime(document.getElementById("detail.startdate").value,
                                   document.getElementById("detail.starttime").value);
   if (directive != "POST") {
     task.id = id;

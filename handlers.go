@@ -87,7 +87,7 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
     // create a persistable task in our world
     t := NewTask(task.GetName())
     t.SetState(task.GetState())
-    t.SetStartTime(task.GetStartTime())
+    t.SetTargetStartTime(task.GetTargetStartTime())
     t.SetEstimate(task.GetEstimate() * time.Minute)
     master.AddChild(t)
     t.Save(true)
@@ -136,7 +136,7 @@ func TaskReplace(w http.ResponseWriter, r *http.Request) {
     // replace all fields of the current task from the request
     t.SetName(task.GetName())
     t.SetState(task.GetState())
-    t.SetStartTime(task.GetStartTime())
+    t.SetTargetStartTime(task.GetTargetStartTime())
     t.SetEstimate(task.GetEstimate() * time.Minute)
     t.Save(false)
 

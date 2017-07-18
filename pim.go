@@ -233,7 +233,7 @@ func runConsoleApp() {
 					//h := startTime.Hour()
 					//m := startTime.Minute()
 					//fullStartTime := time.Date(y, m, d, h, m, 0, 0, nil)
-					currentTask.SetStartTime(&startTime)	
+					currentTask.SetTargetStartTime(&startTime)	
 				} else {
 					fmt.Printf("err = %s\n", err)
 				}
@@ -253,7 +253,7 @@ func runConsoleApp() {
 				fmt.Printf("name = %s\n", currentTask.GetName())
 				fmt.Printf("id = %s\n", currentTask.GetId())
 				fmt.Printf("state = %s\n", currentTask.GetState())
-				fmt.Printf("startTime = %s\n", currentTask.GetStartTime())
+				fmt.Printf("startTime = %s\n", currentTask.GetTargetStartTime())
 				fmt.Printf("estimate = %s\n", currentTask.GetEstimate())
 		}
 

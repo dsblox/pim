@@ -33,9 +33,9 @@ function upsertTask() {
  		list.insertTask(t, sort?'timesort':'end');
 	} else {
 		t = currTask;
-		t.name = name;
-		t.startTime = time;
-		t.estimate = duration;
+		t.setName(name);
+		t.setTargetStartTime(time);
+		t.setEstimate(duration);
 		moveTask(t);
 		currTask = null;
     	updateTask(t); // update the task that changed

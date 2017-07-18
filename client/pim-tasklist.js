@@ -47,7 +47,7 @@ class TaskList {
     else if (bTimeSort) {
       var list = this.tasks;
       var i = 0;
-      while (i < list.length && task.startTime > list[i].startTime) {
+      while (i < list.length && task.getTargetStartTime() > list[i].getTargetStartTime()) {
         i++;
       }
 
