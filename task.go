@@ -34,7 +34,8 @@ func (ts TaskState) String() string {
 // implement the methods in this interface with its own
 // storage backend.
 type TaskDataMapper interface {
-	NewDataMapper() TaskDataMapper // return an empty mapper of your implementation type
+	NewDataMapper(dbName string) TaskDataMapper // return an empty mapper of your implementation type
+	CopyDataMapper() TaskDataMapper  // create a new mapper from an existing one
 	Save(t *Task, saveChildren bool, saveMyself bool) error            // save a task - just the task and parent relationships
 	Load(t *Task, loadChildren bool, root bool) error 		   // load a task - and all its children (note lack of symmetry)
 	Delete(t *Task, p *Task) error // delete a task - optionally reparenting its children
@@ -468,10 +469,10 @@ func (t *Task) AddParent(p *Task) error {
 
 	// if either is missing a mapper then create it
 	if t.persist == nil && p.persist != nil {
-		t.persist = p.persist.NewDataMapper()
+		t.persist = p.persist.CopyDataMapper()
 	}
 	if p.persist == nil && t.persist != nil {
-		p.persist = t.persist.NewDataMapper()
+		p.persist = t.persist.CopyDataMapper()
 	}
 	return nil
 }

@@ -16,6 +16,10 @@ import (
 //     _ "github.com/lib/pq"
  )
 
+const (
+    DB_NAME = "pim"
+)
+
 
 type PimCmd int
 const (
@@ -123,7 +127,7 @@ func checkErr(err error) {
     }
 }
 
-func initMasterTask() *Task {
+func initMasterTask(dbName string) *Task {
     // dummy master task to hold all tasks - this is for conveniece
     // and should not be printed out or saved.
     var masterTask *Task = NewTaskMemoryOnly("Your Task List")
@@ -134,7 +138,7 @@ func initMasterTask() *Task {
     // pattern to fully abstract the persistence layer from the
     // task functionality.  This should be the only place the
     // Tasks know how they are stored.
-    tdmpg := NewTaskDataMapperPostgreSQL(false) // this is a pointer to the concrete object
+    tdmpg := NewTaskDataMapperPostgreSQL(false, dbName) // this is a pointer to the concrete object
     if tdmpg == nil {
     	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
     	return nil
@@ -150,7 +154,7 @@ func initMasterTask() *Task {
 func runConsoleApp() {
     fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
 
-	masterTask := initMasterTask()    
+	masterTask := initMasterTask(DB_NAME)    
 
 	// keep track of a "cursor" task on which to work
     var currentTask *Task = masterTask
@@ -271,12 +275,12 @@ func runConsoleApp() {
 // eventually we'll move this in somewhere else
 var master *Task
 
-func runServerApp(port string, files string, certs string) {
+func runServerApp(port string, files string, certs string, dbName string) {
 	log.Printf("Will run as server soon\n")	
 
 	// initialize a master task (in global for now)
 	// that knows how to map to a database
-	master = initMasterTask()
+	master = initMasterTask(dbName)
 
 	// create an instance of our router with path to files
     router := NewRouter(files)
@@ -304,10 +308,12 @@ func main() {
 	var static_files_location	string
 	var certs_location 			string
 	var listenport 				string
+	var dbName					string
 	flag.BoolVar(&server, "server", false, "start pim as web server rather than console app")
 	flag.StringVar(&static_files_location, "html", "./client", "specify path to static web files on this server")
 	flag.StringVar(&certs_location, "certs", ".", "specify path to TLS certificates on this server")
 	flag.StringVar(&listenport, "port", "4000", "specify port on which the server will take requests")
+	flag.StringVar(&dbName, "db", DB_NAME, "specify the database to use on the server")
 	flag.Parse()
 
 	// if we're starting as a server
@@ -325,117 +331,11 @@ func main() {
 			listenport = ":" + listenport
 		}
 
-		runServerApp(listenport, static_files_location, certs_location)
+		runServerApp(listenport, static_files_location, certs_location, dbName)
 
 	} else {
 
 		runConsoleApp()
-		/*
-	    fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
 
-
-	    // dummy master task to hold all tasks - this is for conveniece
-	    // and should not be printed out or saved.
-	    var masterTask *Task = NewTaskMemoryOnly("Your Console Task List")
-
-	    // initialize the persistence layer - use PostgreSQL
-	    // and assign to masterTask - creating the first data
-	    // mapper initializes the DB - I chose to test a data-mapper
-	    // pattern to fully abstract the persistence layer from the
-	    // task functionality.  This should be the only place the
-	    // Tasks know how they are stored.
-	    tdmpg := NewTaskDataMapperPostgreSQL(false) // this is a pointer to the concrete object
-	    if tdmpg == nil {
-	    	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
-	    	return
-	    }
-	    masterTask.SetDataMapper(tdmpg)
-
-	    // load the task list recursively
-	    masterTask.Load(true)
-
-		// keep track of a "cursor" task on which to work
-	    var currentTask *Task = masterTask
-	    currentTask.current = true
-		printHelp()
-		fmt.Println(masterTask)
-
-		// start the "event loop" based on user input
-		reader := bufio.NewReader(os.Stdin)
-		var printListAfterCmd bool = true
-	    for cmd := printList; cmd != quit;  {
-
-			printListAfterCmd = true
-			fmt.Print("Command: ")
-			text, _ := reader.ReadString('\n')
-			cmd = findCommand(([]rune(text))[0])
-			switch cmd {
-				case help: 
-					printHelp()
-					printListAfterCmd = false
-
-				case printList: 
-					printListAfterCmd = true // happens anyway
-
-				case quit: 
-					fmt.Println("Goodbye!")
-					printListAfterCmd = false
-
-				case upCurrent: 
-					currentTask = moveUp(currentTask)
-
-				case downCurrent: 
-					currentTask = moveDown(currentTask)
-
-				case addTask: 
-					fmt.Print("Enter name of new task: ")
-					taskName, _ := reader.ReadString('\n')
-					t := NewTask(strings.TrimSpace(taskName))
-					currentTask.AddChild(t)
-
-				case renameTask: 
-					fmt.Print("Enter new name of current task: ")
-					taskName, _ := reader.ReadString('\n')
-					currentTask.SetName(strings.TrimSpace(taskName))
-
-				case deleteTask: 
-					taskToKill := currentTask
-					currentTask = moveUp(currentTask)
-					if (!taskToKill.HasParents()) {
-						fmt.Println("Can't delete top level task list")
-					} else {
-						taskToKill.Remove(masterTask)
-					}
-
-				case completeTask:
-					currentTask.SetState(complete)
-
-				case startTask:
-					currentTask.SetState(inProgress)
-
-				case resetTask:
-					currentTask.SetState(notStarted)
-
-				case holdTask:
-					currentTask.SetState(onHold)
-
-				case debugTask:
-					fmt.Printf("name = %s\n", currentTask.Name())
-					fmt.Printf("id = %s\n", currentTask.Id())
-					fmt.Printf("state = %s\n", currentTask.State())
-			}
-
-			// most commands want us to reprint the entire list in
-			// its most recent form
-			if printListAfterCmd {
-				fmt.Println(masterTask)
-			}
-		}
-		
-		// save my immediate sub-tasks (won't save grouping master task)
-		err := masterTask.Save(true)
-		if err != nil {
-			log.Fatal(err)
-		}		*/
 	} // else we started app as a console app
 } // main

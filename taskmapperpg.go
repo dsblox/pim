@@ -11,13 +11,15 @@ import "github.com/lib/pq"
 const (
     DB_USER     = "postgres"
     DB_PASSWORD = "postgres"
-    DB_NAME     = "pim"
     DB_HOST_ENV = "DAB_DB_HOST" // an environment variable i cause to be created
+    // note the database name is always passed in from above
+    // to allow easy switching between databases
 )
 
 // TaskDataMapperPostgreSQL implements TaskDataMapper to persist tasks
 type TaskDataMapperPostgreSQL struct {
 	loaded bool
+	dbName string
 	id int // can we get rid of both of these id and parentIds?
 	parentIds []string
 }
@@ -44,6 +46,7 @@ func (tm *TaskDataMapperPostgreSQL) IsInDB() bool {
 func (tm *TaskDataMapperPostgreSQL) MarkInDB() {
 	tm.loaded = true
 }
+
 /*
 func (tm *TaskDataMapperPostgreSQL) Id() int {
 	return tm.id
@@ -81,7 +84,7 @@ var env *Env = nil
 // PIM database.  This isolates the creation of the new DB.  Note that
 // empty tables are added outside this function for a more elegant use of
 // defer db.Close(). 
-func CreateEmptyPIMDatabase(dbHost string) error {
+func CreateEmptyPIMDatabase(dbHost string, dbName string) error {
 
 	// output to the console (log?) what's going on
 	fmt.Println("PIM Database not found - creating empty database...")
@@ -99,8 +102,8 @@ func CreateEmptyPIMDatabase(dbHost string) error {
     // set the an env now so we can use our dbExec function
     tmpenv := &Env{db: db}
 
-    // dbCreate(tmpenv, DB_NAME)  // string substitution is failing for a reason I don't understand!
-	_, dberr = dbExec(tmpenv, "CREATE DATABASE pim")
+    // dbCreate(tmpenv, dbName)  // string substitution is failing for a reason I don't understand!
+	_, dberr = dbExec(tmpenv, "CREATE DATABASE " + dbName)
 	if dberr != nil {
 		fmt.Printf(" CREATE DATABASE failed with error: %s\n", dberr)
 		return dberr
@@ -115,7 +118,7 @@ func CreateEmptyPIMDatabase(dbHost string) error {
 // TBD - isolate this in a DB layer better and perhaps stop
 // using global variables so we can later support multiple
 // DB connections.
-func NewTaskDataMapperPostgreSQL(saved bool) *TaskDataMapperPostgreSQL {
+func NewTaskDataMapperPostgreSQL(saved bool, dbName string) *TaskDataMapperPostgreSQL {
 
 	// if global env not yet initialized then initialize it
 	if env == nil {
@@ -127,21 +130,27 @@ func NewTaskDataMapperPostgreSQL(saved bool) *TaskDataMapperPostgreSQL {
 		    return nil // we should change this function to return an error
 	    }
 
+	    // if dbName not provided then use the default
+	    if len(dbName) == 0 {
+		    fmt.Printf(" Aborting: DB name not provided\n")
+	    	return nil
+	    }
+
 	    // connect to the PIM database
-	    dbinfo := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, DB_USER, DB_PASSWORD, DB_NAME)
+	    dbinfo := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, DB_USER, DB_PASSWORD, dbName)
 	    db, dberr := NewDB(dbinfo)
 
 	    // if we get an error it may be because this if first time and we need to create DB
 	    if dberr != nil {
 
 	    	// create the empty PIM database and then retry connection
-	    	dberr = CreateEmptyPIMDatabase(dbHost)
+	    	dberr = CreateEmptyPIMDatabase(dbHost, dbName)
 	    	if dberr != nil {
 		    	return nil // we've got bigger problems - couldn't create empty DB
 	    	}
 
 			// connect to the newly created DB and set the env so we can run our commands
-		    dbinfo = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, DB_USER, DB_PASSWORD, DB_NAME)
+		    dbinfo = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, DB_USER, DB_PASSWORD, dbName)
 		    db, dberr = NewDB(dbinfo)
 		    if dberr != nil {
 		    	fmt.Printf(" could not open connection to new pim DB: %s\n", dberr)
@@ -181,15 +190,19 @@ func NewTaskDataMapperPostgreSQL(saved bool) *TaskDataMapperPostgreSQL {
 	} // if we need to initialize the db
 
 	// create and return the mapper object
-	return &TaskDataMapperPostgreSQL{loaded:saved}
+	return &TaskDataMapperPostgreSQL{loaded:saved,dbName:dbName}
 }
 
 // NewDataMapper() implements for PostgreSQL the ability to return a new
 // and unpersisted instance of the mapper that can later be filled in
 // by the object with the list of saved parent ids
-func (tm TaskDataMapperPostgreSQL) NewDataMapper() TaskDataMapper {
-	return NewTaskDataMapperPostgreSQL(false)
+func (tm TaskDataMapperPostgreSQL) NewDataMapper(dbName string) TaskDataMapper {
+	return NewTaskDataMapperPostgreSQL(false, dbName)
 }
+func (tm TaskDataMapperPostgreSQL) CopyDataMapper() TaskDataMapper {
+	return NewTaskDataMapperPostgreSQL(false, tm.dbName)
+}
+
 
 func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself bool) error {
 
@@ -448,7 +461,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 		tm.setTaskFields(k, db_start_time, db_estimate_minutes)
 
 		// set the data mapper onto the child indicating that it was loaded from DB
-		kdm := NewTaskDataMapperPostgreSQL(true)
+		kdm := NewTaskDataMapperPostgreSQL(true, DB_NAME)
 		k.SetDataMapper(kdm)
 
 		// add the child to the supplied parent
