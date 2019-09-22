@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"> 
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- LOCAL VERSIONS -->
+<link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap.min.css">
+<script src="jquery/3.2.1/jquery.min.js"></script>
+<script src="bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="vue/vue.js"></script>
+
+<!-- CDN VERSIONS -->
+<!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" -->
+<!-- script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script -->
+<!-- script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script -->
+<!-- script src="https://unpkg.com/vue"></script -->
+
+<!-- the following three libraries I believe I tried using but never actually used -->
+<!-- script src="https://unpkg.com/axios@0.12.0/dist/axios.min.js"></script -->
+<!-- script src="https://unpkg.com/lodash@4.13.1/lodash.min.js"></script -->
+<!-- script src="https://cdnjs.cloudflare.com/ajax/libs/vue-strap/1.1.29/vue-strap.min.js"></script -->
+
+<!-- The following must be in order - look for a new tool to improve this -->
+<script src="pim-ajax.js"></script>
+<script src="pim-task.js"></script>
+<script src="pim-tasklist.js"></script>
+<script src="pim-taskvue.js"></script>
+<script src="pim-taskajax.js"></script>
+<script src="pim-task-changes.js"></script>
+<script src="pim-taskdragdrop.js"></script>
+
+</head>
+
+<body>
+<nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="#">PIM</a>
+    </div>
+    <ul class="nav navbar-nav">
+      <li><a href="vuepim.html">Today</a></li>
+      <li><a href="planning.html">Planning</a></li> 
+      <li class="active"><a href="whatidid.html">History</a></li> 
+      <li><a href="#">Mission</a></li> 
+    </ul>
+    <ul class="nav navbar-nav navbar-right">
+      <li><a href="#"><span class="glyphicon glyphicon-user"></span> Sign Up</a></li>
+      <li><a href="#"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div id="pim-root" class="container-fluid">
+
+<h1 class="text-center bg-primary lead">
+	What I Did
+</h1>
+
+<div class="row">
+
+  <div class="col-sm-3">
+    <pim-selector-date :onchange="myDateChanged" :init-timestamp="startDate" />
+  </div>
+
+  <div class="col-sm-9">
+    <pim-task-list :task-list="currday" title="Done" v-on:toggle="adjustTask" />
+  </div>
+</div>
+
+</div>
+
+
+<script>
+
+function myDateChanged(newDate) {
+  loadTasksByDay(newDate);
+}
+
+function dateToString(date) {
+  var result = "";
+  result += date.getFullYear();
+  result += "-";
+  result += (date.getMonth() < 9 ? "0" : "") + (date.getMonth() + 1);
+  result += "-";
+  result += (date.getDate() < 10 ? "0" : "") + date.getDate();
+  return result;
+}
+
+// start with today - note startDate is used in
+// two places to make this work - as an input to
+// loadTasksByDay() and to initialize the calendar
+// control.  Once initialized they will stay in sync.
+// var dateFormat = require('dateformat');
+var startDate = dateToString(new Date());
+
+
+// call the server to get tasks and put into the days lists
+loadTasksByDay(startDate);
+
+console.log(currday.title);
+
+
+// here is a root Vue to hold references to my models
+// the data references can be linked to components
+// this is the only place the "outside" JavaScript world
+// is linked into the "inside" world within the vue hierarchy
+// so any functions or data you want to use must be linked here
+new Vue({
+  el: '#pim-root',
+  data: {
+    currday: currday,
+    states: TaskState,
+    myDateChanged: myDateChanged,
+    startDate: startDate,
+  },
+  methods: {
+    adjustTask: function(task) { 
+      moveTask(task)
+    }
+  },
+})
+
+</script>
+</body>
+</html>

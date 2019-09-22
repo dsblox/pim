@@ -13,6 +13,25 @@ function tasksURL(id = "") {
   return makeURL(rest)
 }
 
+function tasksTodayURL() {
+  return makeURL("tasks/today")
+}
+
+function tasksThisWeekURL() {
+  return makeURL("tasks/thisweek")
+}
+
+
+function tasksFindURL(date) {
+  var rest = "tasks";
+  if (date) {
+    rest += "/date/";
+    rest += date;
+  }
+  return makeURL(rest)
+}
+
+
 function ajaxObj() {
  var xmlhttp;
   if (window.XMLHttpRequest) {

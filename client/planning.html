@@ -39,8 +39,8 @@
       <a class="navbar-brand" href="#">PIM</a>
     </div>
     <ul class="nav navbar-nav">
-      <li class="active"><a href="vuepim.html">Today</a></li>
-      <li><a href="planning.html">Planning</a></li> 
+      <li><a href="vuepim.html">Today</a></li>
+      <li class="active"><a href="planning.html">Planning</a></li> 
       <li><a href="whatidid.html">History</a></li> 
       <li><a href="#">Mission</a></li> 
     </ul>
@@ -54,7 +54,7 @@
 <div id="pim-root" class="container-fluid">
 
 <h1 class="text-center bg-primary lead">
-	TODAY: Work on PIM UI
+	Daily Planning
 	<button type="button" class="btn btn-xs btn-primary" data-toggle="modal" data-target="#myModal">
   		<span class="glyphicon glyphicon-plus"></span>&nbsp;
 	</button>
@@ -62,19 +62,15 @@
 
 <div class="row">
 
-  <div class="col-sm-4">
-    <pim-task-list :task-list="scheduled" title="Calendar" v-on:toggle="adjustTask" />
+  <div class="col-sm-6">
+    <pim-task-list :task-list="planWeek" title="Weekly Goals" add="true" v-on:toggle="adjustTask" />
   </div>
 
 
-  <div class="col-sm-4">
-    <pim-task-list :task-list="stuff" title="Stuff To Do" v-on:toggle="adjustTask" />
+  <div class="col-sm-6">
+    <pim-task-list :task-list="planDay" title="Daliy Goals" add="true" v-on:toggle="adjustTask" />
   </div>
 
-
-  <div class="col-sm-4">
-    <pim-task-list :task-list="done" title="Done" clear="true" v-on:toggle="adjustTask" />
-  </div>
 </div>
 
 </div>
@@ -108,13 +104,12 @@
             <label for="durartion">Estimate (minutes):</label>
             <input type="number" class="form-control" id="duration">
           </div>
-          <input type="hidden" id="today" value="true">
-          <input type="hidden" id="thisweek" value="false">
+          <input type="hidden" id="thisweek" value="true">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-warning" data-dismiss="modal" onclick="deleteTask()" id="delete">Delete Task</button>
           <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="cancelModal()" id="cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="upsertTask('today')" id="save">Save Task</button>
+          <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="upsertTask('planning')" id="save">Save Task</button>
         </div>
       </form>
     </div>
@@ -134,15 +129,17 @@ var currTask = null; // remember it so we don't have to look it up again on subm
 $('#myModal').on('show.bs.modal', function (event) {
 
 	// find any data the invocation is trying to send us
-  	var button = $(event.relatedTarget) // Button that triggered the modal
+  	var button = $(event.relatedTarget); // Button that triggered the modal
   	currList = taskListFromID(button.data('list')) // Extract info from data-* attributes
-  	currTask = findTask(button.data('taskid'))
+  	currTask = findTask(button.data('taskid'));
+    console.log(button.data('list'));
+    console.log(currList.numTasks());
 
   	// initialize or clear the modal's form fields
   	var title = null;
   	var f = document.getElementById("newTask");
   	if (currTask != null) {
-  		title = "Edit Task: " + currTask.name
+  		title = "Edit Task: " + currTask.name;
   		f.elements["task"].value = currTask.name;
       f.elements["startdate"].value = extractDateString(currTask.getTargetStartTime());
   		f.elements["starttime"].value = extractTimeString(currTask.getTargetStartTime());
@@ -150,7 +147,15 @@ $('#myModal').on('show.bs.modal', function (event) {
   		f.elements["delete"].style.visibility = 'visible';
 
   	} else {
-  		title = "Create New Task";
+      if (currList.getId() == "PW") {
+  		  title = "Create New Week-Level Task";
+      }
+      else if (currList.getId() == "PD") {
+        title = "Create New Day-Level Task";
+      }
+      else {
+        title = "Create New Task";        
+      }
   		f.elements["task"].value = null;
   		f.elements["startdate"].value = new Date().toISOString().split('T')[0];
       f.elements["starttime"].value = null;
@@ -164,7 +169,8 @@ $('#myModal').on('show.bs.modal', function (event) {
 })
 
 // call the server to get tasks and put into the lists
-loadTasksToday();
+loadTasksThisWeek();
+loadTasksThisDay();
 
 // here is a root Vue to hold references to my models
 // the data references can be linked to components
@@ -174,6 +180,8 @@ new Vue({
     scheduled: scheduled,
     stuff: stuff,
     done: done,
+    planWeek : planWeek,
+    planDay : planDay,
     states: TaskState
   },
   methods: {

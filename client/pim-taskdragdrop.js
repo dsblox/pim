@@ -4,14 +4,25 @@ function allowDrop(ev) {
     ev.preventDefault();
 }
 
+// TBD: this currently works only if you drag and drop the <a> tag that
+// is the task name itself.  We need the task-id to be set on any element
+// that might happen to be dropped from / to such as the checkbox itself
+// or the estimate glyph
 function drag(ev) {
-    ev.dataTransfer.setData("id", ev.target.id);
+    var id = ev.target.id;
+    ev.dataTransfer.setData("id", id);
 }
 
 function drop(ev) {
+    console.log(ev);
+
     ev.preventDefault();
-    var id = ev.dataTransfer.getData("id");
-    dragDropTask(id, ev.target.id)
+
+    var from_id = ev.dataTransfer.getData("id");
+    var to_id = ev.target.id;
+    console.log(from_id);
+    console.log(to_id);
+    dragDropTask(from_id, to_id);
 }
 
 // for now we have no way to drop something to the end of a list
@@ -19,6 +30,7 @@ function drop(ev) {
 //   drag from another list to DONE to mark an item completed
 //   drag within the STUFF or DONE list to reorder
 function dragDropTask(idDropped, idOn) {
+
   // find which list each item is in
   var fromList = listOfTask(idDropped);
   var toList = listOfTask(idOn);

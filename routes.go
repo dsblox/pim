@@ -20,11 +20,29 @@ var routes = Routes{
         "/tasks",
         TaskIndex,
     },
+    Route {
+        "TaskFindToday",
+        "GET",
+        "/tasks/today",
+        TaskFindToday,
+    },
+    Route {
+        "TaskFindThisWeek",
+        "GET",
+        "/tasks/thisweek",
+        TaskFindThisWeek,
+    },
     Route{
         "TaskShow",
         "GET",
         "/tasks/{taskId}",
         TaskShow,
+    },
+    Route {
+        "TaskFindByDate",
+        "GET",
+        "/tasks/date/{date}",
+        TaskFind,
     },
     Route{
         "TaskCreate",

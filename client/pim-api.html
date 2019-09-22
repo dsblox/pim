@@ -18,6 +18,12 @@
     <!--Row with two equal columns-->
       <div class="row">
         <div class="col-sm-6"><!--Column left-->
+
+          <div class="form-group">
+            <label for="list.date">Date:</label>
+            <input type="date" class="form-control" id="list.date">
+          </div>
+  
         <button type="button" class="btn btn-primary" onclick="loadTasks()">List Tasks</button>
         <div id="list">
         </div>
@@ -55,6 +61,15 @@
             <label for="durartion">Estimate (minutes):</label>
             <input type="number" class="form-control" id="detail.duration">
           </div>
+          <div class="form-group">
+            <label for="detail.startdate">Completion Date:</label>
+            <input type="date" class="form-control" id="detail.enddate">
+          </div>
+          <div class="form-group">
+            <label for="detail.starttime">Completion Time:</label>
+            <input type="time" class="form-control" id="detail.endtime">
+          </div>
+
           <button type="button" class="btn btn-primary" onclick="createTask()">Create</button>
           <button type="button" class="btn btn-primary" onclick="replaceTask()">Replace</button>
           <button type="button" class="btn btn-primary" onclick="updateTask()">Update</button>
@@ -95,6 +110,16 @@ function tasksURL(id = "") {
   }
   return makeURL(rest)
 }
+
+function tasksFindURL(date) {
+  var rest = "tasks";
+  if (date) {
+    rest += "/date/";
+    rest += date;
+  }
+  return makeURL(rest)
+}
+
 
 function taskItemHTML(task) {
   html = '<button class=\"btn btn-link\"';
@@ -176,9 +201,49 @@ function extractDate(datetime) {
   return strDate;
 }
 
+function isInRange(strNum, min, max) {
+  var num = parseInt(strNum);
+  return (num >= min && num <= max);
+}
+function forceValidTime(time) {
+  // if it is even worth parsing
+  tooBroken = true;
+  var fixed = "";
+  if (time != null && time.length > 3 && time.length <=8) {
+    // split on colons and always cut things off after 2 colons
+    // take whatever is before and format to seconds
+    parts = time.split(':');
+    if (parts.length != 0) {
+      fixed = (isInRange(parts[0],0,23)?parts[0]:"00");
+      fixed += ":";
+      console.log(fixed);
+      if (parts.length > 1) {
+        fixed += (isInRange(parts[1],0,59)?parts[1]:"00");
+        fixed += ":";
+        console.log(fixed);
+        if (parts.length > 2) {
+          fixed += (isInRange(parts[2],0,59)?parts[2]:"00");
+        }
+        else {
+          fixed += "00";
+        }
+        console.log(fixed);
+      }
+      else {
+        fixed += "00:00";
+      }
+      tooBroken = false;
+    }
+  }
+
+  if (tooBroken) {
+    fixed = "00:00:00"
+  }
+  return fixed;
+}
 
 function formatDateTime(date, time) {
-  return date + "T" + time + ":00Z";
+  return date + "T" + forceValidTime(time) + "Z";
 }
 
 function loadTask(id) {
@@ -195,6 +260,9 @@ function loadTask(id) {
 
         // for now ignore the date - extract just the time
         document.getElementById("detail.starttime").value = extractTime(task.targetStartTime);
+
+        // try getting the date
+        document.getElementById("detail.startdate").value = extractDate(task.targetStartTime); 
       }
     }
   };
@@ -202,6 +270,14 @@ function loadTask(id) {
 }
 
 function loadTasks() {
+
+  // collect any filtering we want to do - for now just date
+  // task.targetStartTime = formatDateTime(document.getElementById("detail.startdate").value,
+  var strdate = document.getElementById("list.date").value;
+  if (strdate.length == 0) {
+    strdate = null;
+  }
+  
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
@@ -212,7 +288,7 @@ function loadTasks() {
       }
     }
   };
-  ajaxGet(ajax, tasksURL());
+  ajaxGet(ajax, tasksFindURL(strdate));
 }
 
 // directives:

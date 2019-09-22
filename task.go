@@ -50,6 +50,9 @@ type Task struct {
 	ActualStartTime *time.Time `json:"actualStartTime,omitempty"` // actual start time of the task
 	ActualCompletionTime *time.Time `json:"actualCompletionTime,omitempty"` // time task is marked done
 	Estimate time.Duration `json:"estimate"` // estimated duration of the task
+	Today bool `json:"today"` // whether or not too show in today view
+	ThisWeek bool `json:"thisweek"` // whether or not to show in this-week view
+	DontForget bool `json:"dontforget"` // whether or not show in don't-forget view
 
 	parents []*Task      // list of parent tasks (we support many parents)
 	kids []*Task         // list of child tasks
@@ -78,6 +81,64 @@ func (list Tasks) FindById(id string) *Task {
 	return nil
 }
 
+// Find all tasks in the list that have the specified completion date (ignore time)
+func (list Tasks) FindByCompletionDate(date time.Time) Tasks {
+	var result Tasks
+	dayToFind := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	fmt.Println("Task:FindByCompletionDate(done.Location=", date.Location(), ")")
+	fmt.Println("Task:FindByCompletionDate(seeking date=", dayToFind, ")")
+	fmt.Println("Task:FindByCompletionDate(tasks provided=", len(list), ")")
+
+	for _, curr := range list {
+		done := curr.GetActualCompletionTime()
+		fmt.Println("Task:FindByCompletionDate(curr=", curr, ")")
+		if done != nil {
+			// note: location should be done.Location() - but set to date for now to make it match
+			// for now we'll assume all dates are UTC and that is what is passed in
+			dayOfTask := time.Date(done.Year(), done.Month(), done.Day(), 0, 0, 0, 0, date.Location())
+			fmt.Println("Task:FindByCompletionDate(dayOfTask=", dayOfTask, ")")
+			if dayToFind == dayOfTask {
+				result = append(result, curr)
+			}
+		}
+	}
+	return result
+}
+
+// return a list of all tasks in the list that have the today flag set
+func (list Tasks) FindToday() Tasks {
+	var result Tasks
+	for _, curr := range list {
+		if curr.IsToday() {
+			result = append(result, curr)			
+		}
+	}
+	return result
+}
+
+
+// return a list of all tasks in the list that have the thisweek flag set
+// and are not complete
+func (list Tasks) FindThisWeek() Tasks {
+	var result Tasks
+	for _, curr := range list {
+		if curr.IsThisWeek() && !curr.IsComplete() {
+			result = append(result, curr)			
+		}
+	}
+	return result
+}
+
+// return a list of all tasks in the list that have the thisweek flag set
+func (list Tasks) FindDontForget() Tasks {
+	var result Tasks
+	for _, curr := range list {
+		if curr.IsDontForget() {
+			result = append(result, curr)			
+		}
+	}
+	return result
+}
 
 
 // NewTask: create a new task with a name, assign a unique id, and default settings
@@ -197,6 +258,10 @@ func (t *Task) GetState() TaskState {
 	return t.State
 }
 
+func (t *Task) IsComplete() bool {
+	return t.GetState() == complete;
+}
+
 // SetName: sets the name field
 func (t *Task) SetName(newName string) {
 	t.Name = newName
@@ -208,28 +273,105 @@ func (t *Task) GetName() string {
 }
 
 func (t *Task) SetTargetStartTime(start *time.Time) {
-	t.TargetStartTime = start;
+	t.TargetStartTime = start
 }
 func (t *Task) GetTargetStartTime() *time.Time {
-	return t.TargetStartTime;
+	return t.TargetStartTime
 }
 func (t *Task) SetActualStartTime(start *time.Time) {
-	t.ActualStartTime = start;
+	t.ActualStartTime = start
 }
 func (t *Task) GetActualStartTime() *time.Time {
-	return t.ActualStartTime;
+	return t.ActualStartTime
 }
 func (t *Task) SetActualCompletionTime(done *time.Time) {
-	t.ActualCompletionTime = done;
+	t.ActualCompletionTime = done
 }
 func (t *Task) GetActualCompletionTime() *time.Time {
-	return t.ActualCompletionTime;
+	return t.ActualCompletionTime
 }
 func (t *Task) SetEstimate(estimate time.Duration) {
-	t.Estimate = estimate;
+	t.Estimate = estimate
 }
 func (t *Task) GetEstimate() time.Duration {
-	return t.Estimate;
+	return t.Estimate
+}
+func (t *Task) SetToday(today bool) {
+	t.Today = today
+}
+func (t *Task) IsToday() bool {
+
+	// if labeled for today, then just return true
+	if t.Today {
+		return true
+	}
+
+	// if there is no target start time then it's not for today
+	target := t.GetTargetStartTime()
+	if target == nil {
+		return false
+	}
+
+	// otherwise we need to check the target completion date and
+	// compare it to today.  TBD: deal with time zones properly.
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, target.Location())
+	dayOfTask := time.Date(target.Year(), target.Month(), target.Day(), 0, 0, 0, 0, target.Location())
+	return today == dayOfTask
+
+}
+
+/*
+==================================================================================
+ About Weekly Tasks
+----------------------------------------------------------------------------------
+ Weekly tasks are intended to do planning at the weekly level.  The simplest way
+ to create a weekly tasks is to create it by hand and label it for "this week."
+ By default, a daily task is NOT a weekly task.
+
+ In contraast to being explicitly set as a weekly task, a task can be automatically
+ "picked up" for "this week" if it's target start time is within the
+ upcoming Sunday-Saturday weekday.
+================================================================================*/
+func (t *Task) SetThisWeek(thisWeek bool) {
+	t.ThisWeek = thisWeek
+}
+
+func (t *Task) IsThisWeek() bool {
+	// if labeled for this week, then just return true
+	if t.ThisWeek {
+		return true
+	}
+
+	// if there is no target start time then it's not for this week
+	target := t.GetTargetStartTime()
+	if target == nil {
+		return false
+	}
+
+	// otherwise we need to check the target start date and
+	// compare it to the range that is this week - we are hard-coded
+	// to start the week on previous Sunday and end on next Saturday (not now)
+	// NOTE: I'm not sure we even want to do this.  Perhaps you should only
+	// put something in the weekly view if it is explicitly set to it?
+	now := time.Now()
+	daysPastSunday := int(now.Weekday())
+	sunday := now.AddDate(0,0,-daysPastSunday)
+	sunday.Truncate((24*time.Hour))
+	saturday := sunday.AddDate(0,0,6)
+
+	dayOfTask := time.Date(target.Year(), target.Month(), target.Day(), 0, 0, 0, 0, target.Location())
+	isThisWeek := (dayOfTask == sunday) || (dayOfTask == saturday) || (dayOfTask.After(sunday) && dayOfTask.Before(saturday))
+	fmt.Printf("IsThisWeek() dayOfTask is between sunday and saturday = %b\n", isThisWeek)
+	return isThisWeek
+}
+
+func (t *Task) SetDontForget(dontForget bool) {
+	t.DontForget = dontForget
+}
+
+func (t *Task) IsDontForget() bool {
+	return t.DontForget;
 }
 
 // IsMemoryOnly: returns memory-only state indicating
@@ -586,6 +728,9 @@ func (t *Task) Save(saveChildren bool) error {
 	err := t.persist.Save(t, saveChildren, !t.memoryonly)
 	if err != nil {
 		return err
+		// TBD - consider how to invalidate the in-memory copy of this object
+		// if it can't be saved.  Should it be removed?  Should we try
+		// again?
 	}
 
 	return nil

@@ -14,6 +14,11 @@ const (
     DB_HOST_ENV = "DAB_DB_HOST" // an environment variable i cause to be created
     // note the database name is always passed in from above
     // to allow easy switching between databases
+
+    // the migration version is used with my homemade migration code
+    // and maps to a 4-digit set of migration files for Origin, Up
+    // and Down files to be run on clean DBs, to upgrade or rollback.
+    DB_MIGRATION_VERSION = 3
 )
 
 // TaskDataMapperPostgreSQL implements TaskDataMapper to persist tasks
@@ -77,6 +82,7 @@ func (tm *TaskDataMapperPostgreSQL) RemoveParentId(id string) {
 // in the TaaskDataMapperPostgreSQL world?
 type Env struct {
     db *sql.DB
+    migrationVersion int
 }
 var env *Env = nil
 
@@ -100,7 +106,7 @@ func CreateEmptyPIMDatabase(dbHost string, dbName string) error {
     defer db.Close()
 
     // set the an env now so we can use our dbExec function
-    tmpenv := &Env{db: db}
+    tmpenv := &Env{db: db, migrationVersion: DB_MIGRATION_VERSION}
 
     // dbCreate(tmpenv, dbName)  // string substitution is failing for a reason I don't understand!
 	_, dberr = dbExec(tmpenv, "CREATE DATABASE " + dbName)
@@ -156,38 +162,24 @@ func NewTaskDataMapperPostgreSQL(saved bool, dbName string) *TaskDataMapperPostg
 		    	fmt.Printf(" could not open connection to new pim DB: %s\n", dberr)
 		    	return nil // we should change this function to return an error
 		    }
-		    env = &Env{db: db}
+		    env = &Env{db: db, migrationVersion: DB_MIGRATION_VERSION}
 
 			// create the tables we need empty
-   			_, dberr = dbExec(env, `CREATE TABLE tasks ( 
-	        	         id CHAR(36) PRIMARY KEY,
-	            	     name VARCHAR(1024) NOT NULL,
-	                	 state INT NOT NULL,
-	                	 target_start_time TIMESTAMP,
-	                	 actual_start_time TIMESTAMP,
-	                	 actual_completion_time TIMESTAMP,
-	                	 estimate_minutes INT,
-		                 created_at TIMESTAMP,
-		                 modified_at TIMESTAMP)`)
+		    dberr = dbMigrateOrigin(env);
+
 			if dberr != nil {
-				fmt.Printf(" CREATE TABLE TASKS failed: %s\n", dberr)
-				return nil
-			}
-   			_, dberr = dbExec(env, `CREATE TABLE task_parents (
-						parent_id CHAR(36) NOT NULL,
-						child_id CHAR(36) NOT NULL,
-						created_at TIMESTAMP,
-						modified_at TIMESTAMP,
-						CONSTRAINT pk_parents PRIMARY KEY (parent_id,child_id),
-						FOREIGN KEY (parent_id) REFERENCES tasks(id),
-						FOREIGN KEY (child_id) REFERENCES tasks(id) )`)
-			if dberr != nil {
-				fmt.Printf(" CREATE TABLE TASKS failed: %s\n", dberr)
+				fmt.Printf(" Initial table creation in empty database failed: %s\n", dberr)
 				return nil
 			}
    			fmt.Println(" successful.")
 	    } else {
-		    env = &Env{db: db}
+		    env = &Env{db: db, migrationVersion: DB_MIGRATION_VERSION}
+		    dberr = dbMigrateUp(env) // TBD: TEST THIS CODE!!!
+		    if dberr != nil {
+				fmt.Printf(" Database migrations failed: %s\n", dberr)
+				return nil
+			}
+
 	    }
 	} // if we need to initialize the db
 
@@ -205,6 +197,42 @@ func (tm TaskDataMapperPostgreSQL) CopyDataMapper() TaskDataMapper {
 	return NewTaskDataMapperPostgreSQL(false, tm.dbName)
 }
 
+// this function is used to update system tags - mapping a boolean that has been set
+// on the task into the task_tags db table
+func (tm TaskDataMapperPostgreSQL) syncSystemTag(tagBool bool, t *Task, tagName string, tagId int, newTask bool) error {
+	if (tagBool) {
+		_, err := dbExec(env, `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) 
+			                   ON CONFLICT ON CONSTRAINT pk_tasktags DO NOTHING`, t.Id, tagId)
+		if (err != nil)	{ 
+			err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert %s tag over task %s: %s", tagName, t.Name, err))
+			return err
+		}
+	} else if !newTask {
+		_, err := dbExec(env, `DELETE FROM task_tags WHERE task_id = $1 AND tag_id = $2`, t.Id, tagId)
+		if (err != nil)	{ 
+			// eat this error - we always try to delete if system tag is not set on the object
+			// this is dangerous - if other DB errors cause this we will eat the error!
+		}		
+	}
+	return nil;
+}
+
+func (tm TaskDataMapperPostgreSQL) syncSystemTags(t *Task, newTask bool) error {
+	err := tm.syncSystemTag(t.Today, t, "today", 1, newTask)
+	if (err != nil) {
+		return err;
+	}
+	err = tm.syncSystemTag(t.ThisWeek, t, "thisweek", 2, newTask)
+	if (err != nil) {
+		return err;
+	}
+	err = tm.syncSystemTag(t.ThisWeek, t, "dontforget", 3, newTask)
+	if (err != nil) {
+		return err;
+	}
+	return nil;
+}
+
 
 func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself bool) error {
 
@@ -215,12 +243,19 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 
 		// upsert the task itself
 		if tm.loaded {
-			_, err := dbExec(env, `UPDATE tasks SET name = $1, state = $2, target_start_time = $3, actual_start_time = $4, actual_completion_time = $5, estimate_minutes = $6  
+			_, err := dbExec(env, `UPDATE tasks SET name = $1, state = $2, target_start_time = $3, actual_start_time = $4, actual_completion_time = $5, estimate_minutes = $6 
 				                   WHERE ID = $7`, t.Name, t.State, t.TargetStartTime, t.ActualStartTime, t.ActualCompletionTime, int(t.Estimate.Minutes()), t.Id)
 			if (err != nil) {
 				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to update task %s: %s", t.Name, err))
 				return err
 			}
+
+			// update today, thisweek and dontforget tags - false means its an update
+			tm.syncSystemTags(t, false)
+			if (err != nil) {
+				return err;
+			}
+
 		} else {
 	    	_, err := dbExec(env, `INSERT INTO tasks (id, name, state, target_start_time, actual_start_time, actual_completion_time, estimate_minutes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, 
 	    		             t.Id, t.Name, t.State, t.TargetStartTime, t.ActualStartTime, t.ActualCompletionTime, int(t.Estimate.Minutes()))
@@ -228,6 +263,13 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert task %s: %s", t.Name, err))
 				return err
 			}
+
+			// update today, thisweek and dontforget tags - true means its a new task
+			tm.syncSystemTags(t, true)
+			if (err != nil) {
+				return err;
+			}
+
 			tm.MarkInDB()
 		}
 
@@ -321,7 +363,10 @@ func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task,
 												 db_target_start_time      pq.NullTime,
 												 db_actual_start_time      pq.NullTime,
 												 db_actual_completion_time pq.NullTime,
-												 db_estimate_minutes       sql.NullInt64) error {
+												 db_estimate_minutes       sql.NullInt64,
+												 db_today				   sql.NullBool,
+												 db_thisweek               sql.NullBool,
+												 db_dontforget             sql.NullBool) error {
 	// go is terrible dealing with null values from databases
 	// must use this intervening struct to track if null or not
 	t.SetTargetStartTime(dbTimeCheck(db_target_start_time))
@@ -340,6 +385,24 @@ func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task,
 	if (db_value_estimate_minutes != nil) {
 		estimate_minutes := db_value_estimate_minutes.(int64)
 		t.SetEstimate(time.Duration(estimate_minutes) * time.Minute)
+	}
+
+	db_value_today, _ := db_today.Value()
+	if (db_value_today != nil) {
+		today := db_value_today.(bool)
+		t.SetToday(today)
+	}
+
+	db_value_thisweek, _ := db_thisweek.Value()
+	if (db_value_thisweek != nil) {
+		thisweek := db_value_thisweek.(bool)
+		t.SetThisWeek(thisweek)
+	}
+
+	db_value_dontforget, _ := db_dontforget.Value()
+	if (db_value_dontforget != nil) {
+		dontforget := db_value_dontforget.(bool)
+		t.SetDontForget(dontforget)
 	}
 
 	return nil	
@@ -390,6 +453,9 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 		db_actual_start_time pq.NullTime
 		db_actual_completion_time pq.NullTime
 		db_estimate_minutes sql.NullInt64
+		db_today sql.NullBool
+		db_thisweek sql.NullBool
+		db_dontforget sql.NullBool
 	)
 
 	// if we're told this is "root" that means we should not attempt
@@ -397,8 +463,15 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 	if (!root) {
 
 		// build and execute the query for the task
-		taskQuery := "SELECT name, state, target_start_time, actual_start_time, actual_completion_time, estimate_minutes FROM tasks WHERE id = '" + t.GetId() + "'"
-		err := env.db.QueryRow(taskQuery).Scan(&name, &state, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes)
+		taskQuery := `SELECT t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes, 
+		              COUNT(tt.tag_id = 1) > 0 AS today, 
+		              COUNT(tt.tag_id = 2) > 0 AS thisweek,
+		              COUNT(tt.tag_id = 3) > 0 AS dontforget
+		              FROM tasks t
+		              LEFT JOIN task_tags tt on tt.task_id = t.id
+		              WHERE id = '" + t.GetId() + "'" + "
+		              GROUP BY t.id`
+		err := env.db.QueryRow(taskQuery).Scan(&name, &state, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes, &db_today, &db_thisweek, &db_dontforget)
 		if err != nil {
 			// log.Printf("query for a task failed: %s, err: %s\n", taskQuery, err)
 			return err
@@ -407,7 +480,7 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 		// overwrite my in-memory values
 		t.SetName(name)
 		t.SetState(state)
-		tm.setTaskFields(t, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes)
+		tm.setTaskFields(t, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes, db_today, db_thisweek, db_dontforget)
 
 		// set myself as loaded from the DB
 		tm.loaded = true
@@ -434,11 +507,20 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 		db_actual_start_time pq.NullTime
 		db_actual_completion_time pq.NullTime
 		db_estimate_minutes sql.NullInt64
+		db_today sql.NullBool
+		db_thisweek sql.NullBool
+		db_dontforget sql.NullBool
 	)
 
-	var baseQuery string = `SELECT t.id, t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes FROM tasks t
-		                       LEFT JOIN task_parents tp ON tp.child_id = t.id
-		                       WHERE tp.parent_id %s`
+	var baseQuery string = `SELECT t.id, t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes,
+				            COUNT(tt.tag_id = 1) > 0 AS today, 
+				            COUNT(tt.tag_id = 2) > 0 AS thisweek,
+				            COUNT(tt.tag_id = 3) > 0 AS dontforget
+	                        FROM tasks t
+		                    LEFT JOIN task_parents tp ON tp.child_id = t.id
+		                    LEFT JOIN task_tags tt ON tt.task_id = t.id
+		                    WHERE tp.parent_id %s
+		                    GROUP BY t.id`
 
     // if no parent on this guy then we're at the top - load root tasks
     var sqlSelect string
@@ -458,16 +540,16 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 
 	// for each child task in the DB
 	for rows.Next() {
-		err := rows.Scan(&id, &name, &state, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes)
+		err := rows.Scan(&id, &name, &state, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes, &db_today, &db_thisweek, &db_dontforget)
 		if err != nil {
-			log.Printf("row scan failed\n")
+			log.Printf("tmpg.loadChildren(): row scan failed\n")
 			log.Fatal(err)
 		}
 		// log.Printf("LoadChildren(): read id=%s, name=%s\n", id, name)
 
 		// create the child task
 		k := &Task{Id:id, Name:name, State:state}
-		tm.setTaskFields(k, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes)
+		tm.setTaskFields(k, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes, db_today, db_thisweek, db_dontforget)
 
 		// set the data mapper onto the child indicating that it was loaded from DB
 		// TBD - this should copy the mapper from tm - shouldn't it??? I think DB_NAME will be
@@ -519,6 +601,7 @@ func (tm *TaskDataMapperPostgreSQL) Delete(t *Task, reparent *Task) error {
 			return err
 		}
 	} else {
+
 		// delete all references to this task from task_parents table
 		_, err := dbExec(env, "DELETE FROM task_parents WHERE parent_id = $1", t.GetId())
 		if err != nil {
@@ -532,6 +615,13 @@ func (tm *TaskDataMapperPostgreSQL) Delete(t *Task, reparent *Task) error {
 	_, err := dbExec(env, "DELETE FROM task_parents WHERE child_id = $1", t.GetId())
 	if err != nil {
 		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to delete child references to task %s with id %d: %s", t.GetName(), t.GetId(), err))
+		return err
+	}
+
+	// delete all tag references from this tasks_tags table
+	_, err = dbExec(env, "DELETE FROM task_tags WHERE task_id = $1", t.GetId())
+	if err != nil { // we should make sure this doesn't return an error if no tags are on the task - if it does we should eat that error
+		err = errors.New(fmt.Sprintf("tdmp.Delete(): Unable to remove tags from task %s with id %d: %s", t.GetName(), t.GetId(), err))
 		return err
 	}
 

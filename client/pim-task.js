@@ -20,11 +20,14 @@ var TaskState = {
 // create our basic task view model
 class Task {
 
-  constructor(id, name, startTime, estimate, complete) {
+  constructor(id, name, startTime, endTime, estimate, complete, today, thisWeek) {
     this.id = id;               // id of the task on the server
     this.name = name;           // name of the task
     this.targetStartTime = startTime; // start time or date
+    this.actualCompletionTime = endTime; // completed datetime
     this.estimate = estimate;   // in minutes
+    this.today = today;
+    this.thisWeek = thisWeek;
     this.state = (complete?TaskState.COMPLETE:TaskState.NOT_STARTED);
     // this.complete = complete;   // true if the task is done - OBSOLETE
   }
@@ -39,6 +42,22 @@ class Task {
 
   isComplete() {
     return (this.state == TaskState.COMPLETE);
+  }
+
+  isToday() {
+    return this.today;
+  }
+
+  setToday(newToday) {
+    this.today = newToday;
+  }
+
+  isThisWeek() {
+    return this.thisWeek;
+  }
+
+  setThisWeek(newThisWeek) {
+    this.thisWeek = newThisWeek;
   }
 
   // return the esimtate as a number even if null
@@ -61,6 +80,18 @@ class Task {
 
   setTargetStartTime(newTime) {
     this.targetStartTime = newTime;
+  }
+
+  hasCompletionTime() {
+    return (this.getActualCompletionTime() != null); // should check type?  typescript?
+  }
+
+  getActualCompletionTime() {
+    return this.actualCompletionTime;
+  }
+
+  setActualCompletionTime(newTime) {
+    this.actualCompletionTime = newTime;
   }
 
   // utility function to convert minutes to a more

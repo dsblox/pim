@@ -51,10 +51,23 @@ function writeTask(task, directive) {
 
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
-      if (this.status == 200) {
-        console.log("success: task created or updated")
-        serverTask = JSON.parse(this.responseText);
-        task.id = serverTask.id;
+      if (this.status == 200 || this.status == 201) {
+        console.log("success: task created or updated");
+
+        // update the task with newly created id
+        if (directive == "POST") {
+          serverTask = JSON.parse(this.responseText);
+          task.id = serverTask.id; 
+        }
+      }
+      else {
+        console.log("writeTask: task create or updated failed.");
+        // TBD: undo any writes in the UI such as
+        // remove an added task that didn't change
+        // or undo a modification that didn't "take"
+        // or at least notify the user that the task
+        // was not saved.
+        alert("Task not properly saved.  Please refresh and try again.");
       }
     }
   };
@@ -71,6 +84,7 @@ function createTask(task) {
     return;
   }
   writeTask(task, "POST");
+  console.log("createTask: new task id=" + task.id);
 }
 
 function updateTask(task) {
@@ -81,7 +95,12 @@ function updateTask(task) {
   writeTask(task, "PUT");
 }
 
-
+function clearToday(task) {
+  if (task.isToday()) {
+    task.setToday(false);
+    updateTask(task);
+  }
+}
 
 // call the server to get our initial list of tasks
 function loadTasks() {
@@ -96,9 +115,12 @@ function loadTasks() {
             t = new Task(task.id, 
                          task.name, 
                          null, // stringToDate(task.getTargetStartTime()), 
-                         task.estimate/nSecPerMinute);
+                         null, // actualCompletionTime
+                         task.estimate/nSecPerMinute,
+                         task.today);
             t.state = task.state; // see mapping in TaskState enum
             t.setTargetStartTime(stringToDate(task.targetStartTime));
+            t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
             if (t.isComplete()) {
               done.insertTask(t);
             }
@@ -107,7 +129,7 @@ function loadTasks() {
                 stuff.insertTask(t);
               }
               else {
-                scheduled.insertTask(t, 'timesort');
+                scheduled.insertTask(t, 'targetstarttime');
               }
             }
         }
@@ -116,3 +138,133 @@ function loadTasks() {
   };
   ajaxGet(ajax, tasksURL());
 }
+
+// call the server to get our initial list of tasks
+function loadTasksToday() {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        tasks = JSON.parse(this.responseText);
+
+        for (i = 0; i < tasks.length; i++) {
+            task = tasks[i];
+            t = new Task(task.id, 
+                         task.name, 
+                         null, // stringToDate(task.getTargetStartTime()), 
+                         null, // actualCompletionTime
+                         task.estimate/nSecPerMinute,
+                         false, // we set complete state later
+                         task.today);
+            t.state = task.state; // see mapping in TaskState enum
+            t.setTargetStartTime(stringToDate(task.targetStartTime));
+            t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+            if (t.isComplete()) {
+              done.insertTask(t, 'actualendtime');
+            }
+            else {
+              if (t.getTargetStartTime() == null) {
+                stuff.insertTask(t);
+              }
+              else {
+                scheduled.insertTask(t, 'targetstarttime');
+              }
+            }
+        }
+      }
+    }
+  };
+  ajaxGet(ajax, tasksTodayURL());
+}
+
+
+// call the server to get the list of tasks for this week
+function loadTasksThisWeek() {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        tasks = JSON.parse(this.responseText);
+
+        for (i = 0; i < tasks.length; i++) {
+          task = tasks[i];
+          t = new Task(task.id, 
+                       task.name, 
+                       null, // stringToDate(task.getTargetStartTime()), 
+                       null, // actualCompletionTime
+                       task.estimate/nSecPerMinute,
+                       false, // we set complete state later
+                       task.today);
+          t.state = task.state; // see mapping in TaskState enum
+          t.setTargetStartTime(stringToDate(task.targetStartTime));
+          t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+          planWeek.insertTask(t);
+        }
+      }
+    }
+  };
+  ajaxGet(ajax, tasksThisWeekURL());
+}
+
+// call the server to get the list of tasks for this day's planning view
+function loadTasksThisDay() {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        tasks = JSON.parse(this.responseText);
+
+        for (i = 0; i < tasks.length; i++) {
+          task = tasks[i];
+          t = new Task(task.id, 
+                       task.name, 
+                       null, // stringToDate(task.getTargetStartTime()), 
+                       null, // actualCompletionTime
+                       task.estimate/nSecPerMinute,
+                       false, // we set complete state later
+                       task.today);
+          t.state = task.state; // see mapping in TaskState enum
+          t.setTargetStartTime(stringToDate(task.targetStartTime));
+          t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+          planDay.insertTask(t);
+        }
+      }
+    }
+  };
+  ajaxGet(ajax, tasksTodayURL());
+}
+
+
+// call the server to get just the tasks completed on the date specified
+function loadTasksByDay(date) {
+  currday.clean();
+  if (date == null) {
+    return;
+  }
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        tasks = JSON.parse(this.responseText);
+        for (i = 0; i < tasks.length; i++) {
+            task = tasks[i];
+            t = new Task(task.id, 
+                         task.name, 
+                         null, // stringToDate(task.getTargetStartTime()), 
+                         null, // actualCompletionTime
+                         task.estimate/nSecPerMinute,
+                         task.today);
+            t.state = task.state; // see mapping in TaskState enum
+            t.setTargetStartTime(stringToDate(task.targetStartTime));
+            t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+
+            // currday is bound to vue so updating it updates the display
+            currday.insertTask(t);
+        }
+      }
+    }
+  };
+  ajaxGet(ajax, tasksFindURL(date));
+}
+
+

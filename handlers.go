@@ -59,6 +59,75 @@ func TaskShow(w http.ResponseWriter, r *http.Request) {
     // fmt.Fprintln(w, "Task show:", taskId)
 }
 
+// TBD: have this route be a find and make the parameters
+// of the URL the meta-data to match on.  For now, only
+// support date.
+func TaskFind(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    strDate := vars["date"]
+    date, _ := time.Parse("2006-01-02", strDate)
+    fmt.Println("TaskFind(date=", date, ")")
+    if !date.IsZero() {
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        w.WriteHeader(http.StatusOK)
+        if master.HasChildren() {
+            matching := master.Kids().FindByCompletionDate(date)
+            if len(matching) > 0 {
+                if err := json.NewEncoder(w).Encode(matching); err != nil {
+                    panic(err)
+                }
+            } else {
+                errorResponse(w, pimErr(emptyList))
+            }
+        } else {
+            errorResponse(w, pimErr(emptyList))
+        }
+    } else {
+        e := pimErr(badRequest)
+        e.AppendMessage(fmt.Sprintf("date '%s' provided could not be parsed.  YYYY-MM-DD format required.", strDate))
+        errorResponse(w, e)        
+    }
+}
+
+// TBD: combined with TaskFind
+func TaskFindToday(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.WriteHeader(http.StatusOK)
+    if master.HasChildren() {
+        matching := master.Kids().FindToday()
+        fmt.Printf("TaskFindToday() num matching = %d\n", len(matching))
+        if len(matching) > 0 {
+            if err := json.NewEncoder(w).Encode(matching); err != nil {
+                panic(err)
+            }
+        } else {
+            errorResponse(w, pimErr(emptyList))
+        }
+    } else {
+        errorResponse(w, pimErr(emptyList))
+    }
+}
+
+// TBD: combined with TaskFind
+func TaskFindThisWeek(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.WriteHeader(http.StatusOK)
+    if master.HasChildren() {
+        matching := master.Kids().FindThisWeek()
+        fmt.Printf("TaskFindThisWeek() num matching = %d\n", len(matching))
+        if len(matching) > 0 {
+            if err := json.NewEncoder(w).Encode(matching); err != nil {
+                panic(err)
+            }
+        } else {
+            errorResponse(w, pimErr(emptyList))
+        }
+    } else {
+        errorResponse(w, pimErr(emptyList))
+    }
+}
+
+
 func taskRead(w http.ResponseWriter, r *http.Request) *Task {
     var task Task
     body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
@@ -68,6 +137,7 @@ func taskRead(w http.ResponseWriter, r *http.Request) *Task {
     if err := r.Body.Close(); err != nil {
         panic(err)
     }
+    fmt.Printf("taskRead() payload received: %s\n", body)
     if err := json.Unmarshal(body, &task); err != nil {
         errorResponse(w, pimErr(badRequest))
         fmt.Println(err)
@@ -88,15 +158,24 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
     t := NewTask(task.GetName())
     t.SetState(task.GetState())
     t.SetTargetStartTime(task.GetTargetStartTime())
+    t.SetActualCompletionTime(task.GetActualCompletionTime())
     t.SetEstimate(task.GetEstimate() * time.Minute)
+    t.SetToday(task.IsToday())
+    t.SetThisWeek(task.IsThisWeek())
     master.AddChild(t)
-    t.Save(true)
+    err := t.Save(true)
+    if (err != nil) {
+        fmt.Printf("TaskCreate: save failed with errror: %s\n", err)
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        w.WriteHeader(http.StatusInternalServerError)
+    } else {
 
-    // set the successful response to include task
-    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-    w.WriteHeader(http.StatusCreated)
-    if err := json.NewEncoder(w).Encode(t); err != nil {
-        panic(err)
+        // set the successful response to include task
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        w.WriteHeader(http.StatusCreated)
+        if err := json.NewEncoder(w).Encode(t); err != nil {
+            panic(err)
+        }
     }
 }
 
@@ -137,14 +216,23 @@ func TaskReplace(w http.ResponseWriter, r *http.Request) {
     t.SetName(task.GetName())
     t.SetState(task.GetState())
     t.SetTargetStartTime(task.GetTargetStartTime())
+    t.SetActualCompletionTime(task.GetActualCompletionTime())
     t.SetEstimate(task.GetEstimate() * time.Minute)
-    t.Save(false)
+    t.SetToday(task.IsToday())
+    err := t.Save(false)
 
-    // set the successful response to include replaced task
-    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-    w.WriteHeader(http.StatusOK)
-    if err := json.NewEncoder(w).Encode(t); err != nil {
-        panic(err)
+    if (err != nil) {
+        fmt.Printf("TaskReplace: save failed with errror: %s\n", err)
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        w.WriteHeader(http.StatusInternalServerError)
+    } else {
+
+        // set the successful response to include replaced task
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        w.WriteHeader(http.StatusOK)
+        if err := json.NewEncoder(w).Encode(t); err != nil {
+            panic(err)
+        }
     }
 }
 

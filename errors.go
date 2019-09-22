@@ -19,9 +19,16 @@ type PimError struct {
 
 func (e *PimError) Error() string { return e.Msg }
 
+func (e *PimError) AppendMessage(additionalText string) {
+	e.Msg += ": "
+	e.Msg += additionalText
+}
+
+
 func pimErr(id PimErrId) PimError {
 	return pimErrors[id]
 }
+
 
 type PimErrors []PimError
 

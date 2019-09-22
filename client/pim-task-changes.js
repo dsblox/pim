@@ -4,38 +4,67 @@ var scheduled = new TaskList();
 var stuff = new TaskList();
 var done = new TaskList();
 
+var planWeek = new TaskList();
+planWeek.setId("PW");
+var planDay = new TaskList();
+planDay.setId("PD");
 
-function upsertTask() {
+var days = {};
+var currday = new TaskList();
+
+function upsertTask(view) {
 	var t = null;
 	var f = document.getElementById("newTask");
-	var name = f.elements["task"].value;
+	var name    = f.elements["task"].value;
     var strdate = f.elements["startdate"].value;
 	var strtime = f.elements["starttime"].value;
+	// we decide whether or not to set the "today" flag based on if a date
+	// has been specified - not on the hidden field as we originally coded.
+	// var today   = (f.elements["today"].value == "true"); // hidden field useable by every UI
 	var time = null;
 	if ((strtime.length > 0) && (strdate.length > 0)) {
 		// remember time will be sent in local time zone
 		// with TZ info and will be stored in GMT
 	  	time = new Date(strdate + " " + strtime);
+	  	today = false;
 	}
+	else {
+		today = true;
+	}
+
+	// we decide whether or not to set the thisweek flag based on the hidden field
+	var thisWeek = (f.elements["thisweek"].value == "true"); // hidden field useable by every UI
+	console.log("upsertTask: thisWeek=" + thisWeek);
+
 	var duration = parseInt(f.elements["duration"].value);
 	if (isNaN(duration)) {
 		duration = null;
 	}
 	if (currTask == null) {
-		t = new Task(null, name, time, duration, false);
+		t = new Task(null, name, time, null, duration, false, today, thisWeek);
     	createTask(t); // create a new task on the server
-		var list = stuff;
-		var sort = false;
-		if (time != null) {
-			list = scheduled;
-			sort = true;
-		}
- 		list.insertTask(t, sort?'timesort':'end');
+
+    	if (view == 'planning') {
+    		planWeek.insertTask(t);
+ 		}
+ 		else {
+			var list = stuff;
+			var sort = false;
+			if (time != null) {
+				list = scheduled;
+				sort = true;
+			}
+ 			list.insertTask(t, sort?'targetstarttime':'end');
+ 		}
+ 		console.log("upsertTask: new task id=" + t.id);
+ 		// tbd: put the id into the local version of the task
 	} else {
 		t = currTask;
 		t.setName(name);
 		t.setTargetStartTime(time);
 		t.setEstimate(duration);
+		t.setToday(today);
+		t.setThisWeek(thisWeek);
 		moveTask(t);
 		currTask = null;
     	updateTask(t); // update the task that changed
@@ -58,6 +87,12 @@ function deleteTask() {
 	// remove what we hope is the last reference to the task
 	currTask = null;
 }
+
+
+function cancelModal() {
+	currTask = null;
+}
+
 
 
 function findTaskInList(list, id, returnType) {
@@ -149,6 +184,8 @@ function taskListFromID(id) {
 		case "C": result = scheduled; break;
 		case "S": result = stuff;     break;
 		case "D": result = done;      break;
+		case "PW": result = planWeek; break;
+		case "PD": result = planDay;  break;
 	}
 	return result;
 }
@@ -159,14 +196,26 @@ function taskListFromID(id) {
 // note that we get the event the value on the task hasn't
 // changed yet so we check for the opposite.
 // right now it will also make an ajax call to update the task
+// TBD: in today view, when the date of a task changes to another
+//   date then we should remove it from this view entirely.  Not
+//   being done right now.  Once we have a planning view where
+//.  we can see all our tasks across days we can implement that.
 function moveTask(task) {
   if (task == null) { return; }
+
+  // console.log(task.actualCompletionTime);
+  console.log("in moveTask()");
+
 
   // task is done
   if (task.isComplete()) {
 
     // make sure it is in the done list
     done.insertTask(task, false);
+
+    // make now it's completion time
+    now = new Date();
+    task.setActualCompletionTime(now.toJSON());
 
     // if it was in the scheduled or stuff lists remove it
     scheduled.removeTask(task);
@@ -178,9 +227,12 @@ function moveTask(task) {
     // remove from done list if it was there
     done.removeTask(task);
 
+    // clear any completion time if its not really done
+    task.setActualCompletionTime(null);
+
     // put it into scheduled or stuff by whether it has startTime
     if (task.hasStartTime()) {
-      scheduled.insertTask(task, 'timesort');
+      scheduled.insertTask(task, 'targetstarttime');
       stuff.removeTask(task);
     } else {
       stuff.insertTask(task);
@@ -203,4 +255,18 @@ function toggleTask(task) {
 
  	moveTask(task);
 }
+
+function clearTodayAndList(list) {
+  var len = list.tasks.length;
+  // go backwards so we can remove items from the end
+  // and do the loop for both server and UI
+  for (var i = len - 1; i >= 0; i--) {
+    task = list.tasks[i];
+    clearToday(task);
+    list.removeTask(task);
+  }  
+}
+
+
+
 

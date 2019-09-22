@@ -16,7 +16,7 @@ class TaskList {
   }
 
   getId() {
-  	return id;
+  	return this.id;
   }
 
   setId(newId) {
@@ -30,21 +30,17 @@ class TaskList {
     //   - instruction to place at 'end'
     //   - instruction to place in time order
     //   - insutrction to place after task with that 'id'
-    var bTimeSort = (placement == 'timesort')
-    var bInsertAfter = (!bTimeSort && placement != 'end')
+    var bStartTimeSort = (placement == 'targetstarttime')
+    var bDoneTimeSort = (placement == 'actualendtime')
+    var bInsertAfter = (!bStartTimeSort && !bDoneTimeSort && placement != 'end')
 
 	  // don't allow the same task 2x in this list
   	if (this.findTask(task.id) != null) {
   		return; 
   	}
 
-  	// if no time sort needed add to the end
-    if ((!task.hasStartTime() || !bTimeSort) && (!bInsertAfter)) {
-      this.tasks.push(task);
-    }
-
-    // if time sort needed run the list to insert
-    else if (bTimeSort) {
+    // if time sort by start time needed run the list to insert
+    if (bStartTimeSort && task.hasStartTime()) {
       var list = this.tasks;
       var i = 0;
       while (i < list.length && task.getTargetStartTime() > list[i].getTargetStartTime()) {
@@ -58,7 +54,24 @@ class TaskList {
         list.splice(i, 0, task);
       }    
     }
-    // if time sort needed run the list to insert
+
+    // if time sort by end time needed run the list to insert
+    else if (bDoneTimeSort && task.hasCompletionTime()) {
+      var list = this.tasks;
+      var i = 0;
+      while (i < list.length && task.getActualCompletionTime() > list[i].getActualCompletionTime()) {
+        i++;
+      }
+
+      // if i'm off the end then add to the end otherwise insert
+      if (i >= list.length) {
+        list.push(task);
+      } else {
+        list.splice(i, 0, task);
+      }    
+    }
+
+    // if to be added after a specific task number
     else if (bInsertAfter) {
       var list = this.tasks;
       var i = 0;
@@ -73,6 +86,12 @@ class TaskList {
         list.splice(i, 0, task);
       }    
     }
+
+    // otherwise just add to the end
+    else {
+      this.tasks.push(task);      
+    }
+
   }
 
   // remove a task from the list
@@ -116,6 +135,19 @@ class TaskList {
 
   numTasks() {
     return this.tasks.length;
+  }
+
+  clean() {
+    this.tasks = [];
+  }
+
+  copy(target) {
+    target.clean();
+    var len = this.tasks.length;
+    for (var i = 0; i < len; i++) {
+      target.insertTask(this.tasks[i]);
+    }
+    return target;
   }
 
 }

@@ -1,6 +1,7 @@
 // create a component with the property "task" which is expected to be an object with
 // attributes for whether it is "complete", some "text" and an "id".  The task is
 // displayed as a checkbox bound to the "state" field of the task object provided
+
 Vue.component('pim-start-time', {
   props: ['task'],
   template: '<span v-if="task.hasStartTime()"><strong><small>{{task.startTimeString()}}</small></strong></span>'
@@ -9,8 +10,9 @@ Vue.component('pim-start-time', {
 Vue.component('pim-task-name', {
 	props: ['name', 'id'],
 	template: '<a href="#myModal" \
-				  data-toggle="modal" \
+				        data-toggle="modal" \
 	              data-target="#myModal" \
+                :id="id" \
 	              :data-taskid="id">{{name}}</a>',
 })
 
@@ -26,18 +28,21 @@ Vue.component('pim-task', {
       this.$emit('toggle', this.task);
     }
   },
-  template:'<div :id="task.id" class="checkbox" draggable="true" ondragstart="drag(event)" \
-                 ondrop="drop(event)" ondragover="allowDrop(event)"> \
-              <label> \
-                <input type="checkbox" :id="task.id" v-model="task.state" \
-                	   v-bind:true-value=1 v-bind:false-value=0 \
-                     v-on:click="toggle"> \
-              	<pim-start-time :task="task"></pim-start-time> \
-              	<pim-task-name :name="task.getName()" :id="task.id"></pim-task-name> \
+  template:'<div :id="task.id" class="checkbox clearfix" draggable="true" ondragstart="drag(event)"  \
+                 ondrop="drop(event)" ondragover="allowDrop(event)" > \
+              <label :id="task.id" class="col-sm-10"> \
+                  <input type="checkbox" :id="task.id" v-model="task.state" id="inner" \
+                  	   v-bind:true-value=1 v-bind:false-value=0 \
+                       v-on:click="toggle"> \
+                	<pim-start-time :task="task"></pim-start-time> \
+                	<pim-task-name :name="task.getName()" :id="task.id"></pim-task-name> \
               </label> \
-              <pim-task-estimate :estimate="task.estimateString()"></pim-task-estimate> \
+              <div class="pull-right"> \
+                <pim-task-estimate :estimate="task.estimateString()"></pim-task-estimate> \
+              </div> \
             </div>'
 })
+
 
 Vue.component('pim-add', {
 	props: ['id'],
@@ -47,9 +52,24 @@ Vue.component('pim-add', {
 	              :data-list="id"> + </a>'
 })
 
+Vue.component('pim-clear', {
+  props: ['taskList'],
+  template: '<a href="#" v-on:click="clear"> \
+                <span class="glyphicon glyphicon-transfer"></span> \
+             </a>',
+  methods: {
+    clear: function(event) {
+      clearTodayAndList(this._props.taskList);
+    }
+  }
+})
+
+// TBD: make the task list data-bound to the isToday() field on the
+// tasks so they can automatically clear out when the clear link is
+// clicked.
 
 Vue.component('pim-task-list', {
-  props: ['taskList', 'title', 'add'],
+  props: ['taskList', 'title', 'add', 'clear'],
   data: function () {
     return {
       numTasks: this.taskList.tasks.length,
@@ -69,14 +89,64 @@ Vue.component('pim-task-list', {
   },
   template: '<div class="panel panel-primary"> \
                <div class="panel-heading"> \
-                <h4 class="panel-title">{{title}} \
-                <pim-add v-if="this.add" :id="id" /> \
-                <span v-if="this.taskList.duration()" class="badge pull-right" >{{this.taskList.durationFormatted()}}</span></h4> \
+                 <h4 class="panel-title">{{title}} \
+                 <pim-add v-if="this.add" :id="id" /> \
+                 <span v-if="this.taskList.duration()" class="badge pull-right" >{{this.taskList.durationFormatted()}}</span> \
+                 <pim-clear v-if="this.clear" :taskList="taskList" /> \
+                 </h4> \
                </div> \
-               <div class="list-group">\
-                <template v-for="task in taskList.tasks">\
-                 <pim-task :task="task" class=list-group-item v-on:toggle="toggle" /> \
-               </template> \
+               <div class="list-group container-fluid"> \
+                  <pim-task v-for="task in taskList.tasks" :key="task.id" :task="task" class=list-group-item v-on:toggle="toggle" /> \
               </div> \
+             </div>'
+})
+
+
+
+
+// trying to create a general datetime control that I can customize for PIM
+// but also be generic for re-use                 
+
+Vue.component('dab-datetime', {
+  props: ['onchange', 'initTimestamp'],
+  data: function() {
+    return {
+      // type: "date",
+      timestamp: null,
+      changeHandler: null
+    }
+  },
+  methods: {
+    onChanged: function(event) {
+      if (this.changeHandler != null && 
+          typeof this.changeHandler === "function") {
+        this.changeHandler(this.timestamp); // make this send the new date instead of the event
+      }
+    }
+  },
+  created: function () {
+    if (this.onchange !== undefined && this.onchange !== undefined) {
+      this.changeHandler = this.onchange;
+    }
+    console.log(this.initTimestamp);
+    this.timestamp = this.initTimestamp;
+  },
+  template: '<div class="form-group"> \
+               <input v-on:change="onChanged" v-model="timestamp" type="date" class="form-control"> \
+             </div>'
+})
+
+Vue.component('pim-selector-date', {
+  props: ['onchange', 'initTimestamp'],
+  created: function() {
+    console.log(this.initTimestamp);
+  },
+  template: '<div class="panel panel-primary"> \
+               <div class="panel-heading"> \
+                 <h4 class="panel-title">Date</h4> \
+               </div> \
+               <dab-datetime :onchange="onchange" :init-timestamp="initTimestamp" /> \
             </div>'
 })
+
+
