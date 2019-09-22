@@ -1,3 +1,4 @@
+// we should find a way to make this more dynamic
 var baseURL = "https://localhost:4000/";
 
 function makeURL(rest) {
