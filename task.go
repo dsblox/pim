@@ -144,7 +144,7 @@ func (list Tasks) FindDontForget() Tasks {
 // NewTask: create a new task with a name, assign a unique id, and default settings
 // When we break Tasks into its own package we will rename this to just "New()"
 func NewTask(name string) *Task {
-	id,_ = Id:uuid.NewV4()
+	id,_ := uuid.NewV4()
 	return &Task{id.String(), Name:name, State:notStarted, memoryonly:false}
 }
 
@@ -152,7 +152,7 @@ func NewTask(name string) *Task {
 // so you can iterate over them or manipulate them, but designated never to be
 // saved- note that it does have an id
 func NewTaskMemoryOnly(name string) *Task {
-	id,_ = Id:uuid.NewV4()
+	id,_ := uuid.NewV4()
 	return &Task{id.String(), Name:name, State:notStarted, memoryonly:true}	
 }
 
