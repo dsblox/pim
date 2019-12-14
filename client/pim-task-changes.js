@@ -18,23 +18,30 @@ function upsertTask(view) {
 	var name    = f.elements["task"].value;
     var strdate = f.elements["startdate"].value;
 	var strtime = f.elements["starttime"].value;
-	// we decide whether or not to set the "today" flag based on if a date
-	// has been specified - not on the hidden field as we originally coded.
-	// var today   = (f.elements["today"].value == "true"); // hidden field useable by every UI
+	var today   = (f.elements["today"].value == "true"); // hidden field useable by every UI
 	var time = null;
+
+	if (strtime.length > 0) {
+		// if date not specified, assume today		
+		if (strdate.length == 0) {
+			var today = new Date();
+			strdate = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();			
+		}
+		// remember time will be sent in local time zone
+		// with TZ info and will be stored in GMT		
+		time = new Date(strdate + " " + strtime);
+	}
+
 	if ((strtime.length > 0) && (strdate.length > 0)) {
 		// remember time will be sent in local time zone
 		// with TZ info and will be stored in GMT
 	  	time = new Date(strdate + " " + strtime);
-	  	today = false;
 	}
-	else {
-		today = true;
-	}
+	console.log("upsertTask: time=" + time);
+
 
 	// we decide whether or not to set the thisweek flag based on the hidden field
 	var thisWeek = (f.elements["thisweek"].value == "true"); // hidden field useable by every UI
-	console.log("upsertTask: thisWeek=" + thisWeek);
 
 	var duration = parseInt(f.elements["duration"].value);
 	if (isNaN(duration)) {
@@ -67,7 +74,7 @@ function upsertTask(view) {
 		t.setThisWeek(thisWeek);
 		moveTask(t);
 		currTask = null;
-    	updateTask(t); // update the task that changed
+    	replaceTask(t); // set all the fields on this task
 	}
 }
 
@@ -221,6 +228,9 @@ function moveTask(task) {
     scheduled.removeTask(task);
     stuff.removeTask(task);
 
+    // when we update change the state and completion time
+    task.dirty = ["state", "actualcompletiontime"];
+
 
   } else {
 
@@ -238,9 +248,14 @@ function moveTask(task) {
       stuff.insertTask(task);
       scheduled.removeTask(task);
     }
+
+    // when we update change the state and completion time
+    task.dirty = ["state", "actualcompletiontime", "targetstarttime"];
   }
 
   // call the server to update the task persistently
+  // only changing the state and completion time
+
   updateTask(task);
 }
 

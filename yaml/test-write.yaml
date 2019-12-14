@@ -1,0 +1,7 @@
+tasks:
+- {id: 8, parents: [c8b25b26-dc4a-4517-8648-846d7f8f49fd], name: Make YAML even work, state: 0, estimate: 90, tags: ['today', 'thisweek']}
+- {id: 1, parents: [c8b25b26-dc4a-4517-8648-846d7f8f49fd], name: Make YAML Parser, state: 0, estimate: 120, tags: ['today']}
+- {id: 2, parents: [c8b25b26-dc4a-4517-8648-846d7f8f49fd], name: Crossword with Sandy, state: 0, estimate: 45, tags: ['today']}
+- {id: 3, parents: [c8b25b26-dc4a-4517-8648-846d7f8f49fd], name: Clean Kitchen, state: 0, estimate: 30, tags: ['today']}
+- {id: 301, parents: [3], name: Empty Dishwasher, state: 0, estimate: 10, tags: ['today']}
+- {id: 302, parents: [3], name: Clean Dishes and Bottles, state: 0, estimate: 15, tags: []}

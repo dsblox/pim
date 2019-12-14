@@ -132,29 +132,42 @@ func initMasterTask(dbName string) *Task {
     // and should not be printed out or saved.
     var masterTask *Task = NewTaskMemoryOnly("Your Task List")
 
-    // initialize the persistence layer - use PostgreSQL
-    // and assign to masterTask - creating the first data
-    // mapper initializes the DB - I chose to test a data-mapper
-    // pattern to fully abstract the persistence layer from the
-    // task functionality.  This should be the only place the
-    // Tasks know how they are stored.
-    tdmpg := NewTaskDataMapperPostgreSQL(false, dbName) // this is a pointer to the concrete object
-    if tdmpg == nil {
-    	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
-    	return nil
-    }
-    masterTask.SetDataMapper(tdmpg)
+    if dbName == "YAML" {
 
-    // load the task list recursively
-    masterTask.Load(true)
+    	tdmyaml := NewTaskDataMapperYAML("yaml/tasks.yaml")
+    	if tdmyaml == nil {
+			log.Printf("PIM was unable to use create the YAML Data Mapper.  Exiting...\n")
+			return nil
+    	}
+    	masterTask.SetDataMapper(tdmyaml)
+
+    } else {
+
+	    // initialize the persistence layer - use PostgreSQL
+	    // and assign to masterTask - creating the first data
+	    // mapper initializes the DB - I chose to test a data-mapper
+	    // pattern to fully abstract the persistence layer from the
+	    // task functionality.  This should be the only place the
+	    // Tasks know how they are stored.
+	    tdmpg := NewTaskDataMapperPostgreSQL(false, dbName) // this is a pointer to the concrete object
+	    if tdmpg == nil {
+	    	fmt.Print("PIM requires a local PostgreSQL database to running.  Exiting...\n")
+	    	return nil
+	    }
+	    masterTask.SetDataMapper(tdmpg)
+
+	}
+
+	// load the task list recursively
+	masterTask.Load(true)
 
     return masterTask
 }
 
-func runConsoleApp() {
+func runConsoleApp(dbName string) {
     fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
 
-	masterTask := initMasterTask(DB_NAME)    
+	masterTask := initMasterTask(dbName)    
 
 	// keep track of a "cursor" task on which to work
     var currentTask *Task = masterTask
@@ -279,7 +292,7 @@ func runServerApp(port string, files string, certs string, dbName string) {
 	log.Printf("Will run as server soon\n")	
 
 	// initialize a master task (in global for now)
-	// that knows how to map to a database
+	// that knows how to map to a database or YAML file
 	master = initMasterTask(dbName)
 
 	// create an instance of our router with path to files
@@ -335,7 +348,7 @@ func main() {
 
 	} else {
 
-		runConsoleApp()
+		runConsoleApp(dbName)
 
 	} // else we started app as a console app
 } // main

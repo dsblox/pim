@@ -256,7 +256,7 @@ function loadTask(id) {
         document.getElementById("detail.id").value = task.id;
         document.getElementById("detail.name").value = task.name;
         document.getElementById("detail.state").value = task.state;
-        document.getElementById("detail.duration").value = task.estimate / nSecPerMinute;
+        document.getElementById("detail.duration").value = task.estimate;
 
         // for now ignore the date - extract just the time
         document.getElementById("detail.starttime").value = extractTime(task.targetStartTime);
@@ -302,11 +302,14 @@ function writeTask(directive) {
   id = document.getElementById("detail.id").value;
   task.name = document.getElementById("detail.name").value;
   task.state = document.getElementById("detail.state").value * 1;
-  task.estimate = document.getElementById("detail.duration").value * nSecPerMinute;
+  task.estimate = document.getElementById("detail.duration").value * 1;
   task.targetStartTime = formatDateTime(document.getElementById("detail.startdate").value,
                                   document.getElementById("detail.starttime").value);
   if (directive != "POST") {
     task.id = id;
+    if (directive == "PATCH") {
+      task.dirty = ["name", "state", "estimate", "targetstarttime", "actualcompletiontime"];
+    }
   }
   else {
     id = "";

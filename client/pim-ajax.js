@@ -132,11 +132,14 @@ function createTask() {
 function replaceTask() {
   writeTask("PUT"); // PUT means replace
 }
+
+// -- never called - if needed we'll need to rename!!! conflicts with the one in pim-taskajax.js
 function updateTask() {
   // this isn't working yet - if a field has not been changed it should
   // not even be included in the JSON that gets sent to the server.  We
   // need to add "dirty flags" to our form fields and only send the dirty
   // info if we want to properly test this.
+  console.log("updateTask()");
   writeTask("PATCH"); // PATCH means update
 }
 

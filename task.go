@@ -34,7 +34,7 @@ func (ts TaskState) String() string {
 // implement the methods in this interface with its own
 // storage backend.
 type TaskDataMapper interface {
-	NewDataMapper(dbName string) TaskDataMapper // return an empty mapper of your implementation type
+	NewDataMapper(storageName string) TaskDataMapper // return an empty mapper of your implementation type
 	CopyDataMapper() TaskDataMapper  // create a new mapper from an existing one
 	Save(t *Task, saveChildren bool, saveMyself bool) error            // save a task - just the task and parent relationships
 	Load(t *Task, loadChildren bool, root bool) error 		   // load a task - and all its children (note lack of symmetry)
@@ -43,16 +43,17 @@ type TaskDataMapper interface {
 
 // Task: our central type for the whole world here - will become quite large over time
 type Task struct {
-	Id string  `json:"id"`        // unique id of the task - TBD make this pass through to mapper!!!
-	Name string `json:"name"`     // name of the task
-	State TaskState `json:"state"` // state of the task
-	TargetStartTime *time.Time `json:"targetStartTime,omitempty"` // targeted start time of the task
-	ActualStartTime *time.Time `json:"actualStartTime,omitempty"` // actual start time of the task
-	ActualCompletionTime *time.Time `json:"actualCompletionTime,omitempty"` // time task is marked done
-	Estimate time.Duration `json:"estimate"` // estimated duration of the task
-	Today bool `json:"today"` // whether or not too show in today view
-	ThisWeek bool `json:"thisweek"` // whether or not to show in this-week view
-	DontForget bool `json:"dontforget"` // whether or not show in don't-forget view
+	id string         	// unique id of the task - TBD make this pass through to mapper!!!
+	name string      	// name of the task
+	state TaskState  	// state of the task
+	TargetStartTime *time.Time  	// targeted start time of the task
+	ActualStartTime *time.Time  	// actual start time of the task
+	ActualCompletionTime *time.Time // time task is marked done
+	Estimate time.Duration  		// estimated duration of the task
+	// today bool  		// whether or not too show in today view
+	// thisWeek bool  		// whether or not to show in this-week view
+	// dontForget bool  	// whether or not show in don't-forget view
+	tags []string 		// all the things - for now today, thisweek, dontforget
 
 	parents []*Task      // list of parent tasks (we support many parents)
 	kids []*Task         // list of child tasks
@@ -80,6 +81,7 @@ func (list Tasks) FindById(id string) *Task {
 	}
 	return nil
 }
+
 
 // Find all tasks in the list that have the specified completion date (ignore time)
 func (list Tasks) FindByCompletionDate(date time.Time) Tasks {
@@ -143,24 +145,24 @@ func (list Tasks) FindDontForget() Tasks {
 
 // NewTask: create a new task with a name, assign a unique id, and default settings
 // When we break Tasks into its own package we will rename this to just "New()"
-func NewTask(name string) *Task {
+func NewTask(newName string) *Task {
 	id,_ := uuid.NewV4()
-	return &Task{Id:id.String(), Name:name, State:notStarted, memoryonly:false}
+	return &Task{id:id.String(), name:newName, state:notStarted, memoryonly:false}
 }
 
 // an in-memory-only task that will never be saved - used to group other tasks
 // so you can iterate over them or manipulate them, but designated never to be
 // saved- note that it does have an id
-func NewTaskMemoryOnly(name string) *Task {
-	id,_ := uuid.NewV4()
-	return &Task{Id:id.String(), Name:name, State:notStarted, memoryonly:true}	
+func NewTaskMemoryOnly(newName string) *Task {
+	newId,_ := uuid.NewV4()
+	return &Task{id:newId.String(), name:newName, state:notStarted, memoryonly:true}	
 }
 
 func (taska *Task) Equal(taskb *Task) bool {
 	return taska.GetId() == taskb.GetId()
 }
 func (taska *Task) DeepEqual(taskb *Task) bool {
-	return (taska.Id == taskb.Id && taska.State == taskb.State && taska.Name == taskb.Name)
+	return (taska.id == taskb.id && taska.state == taskb.state && taska.name == taskb.name)
 	// tbd: run child and parent lists and at least ensure their ids match
 	// avoid recursing here as you'll end up running the entire tree in both directions
 }
@@ -178,7 +180,7 @@ func (t *Task) DataMapper() TaskDataMapper {
 
 // stateChar: map from current state to the UTF-8 code for console display of the state
 func (t Task) stateChar() string {
-	return string(stateChars[t.State])
+	return string(stateChars[t.state])
 }
 
 func RenderTime(t* time.Time) string {
@@ -204,8 +206,12 @@ func (t Task) StringSingle(level int) string {
 	} else {
 		s += " "
 	}
-	s += fmt.Sprintf("[%v] <%v> %v <%d> (%d sub-tasks)", t.stateChar(), RenderTime(t.TargetStartTime), t.Name, t.Estimate, len(t.kids))
+	s += fmt.Sprintf("[%v] <%v> %v <%d> (%d sub-tasks)", t.stateChar(), RenderTime(t.TargetStartTime), t.GetName(), t.Estimate / time.Minute, len(t.kids))
 	return s
+}
+
+func (t Task) GetTargetStartTimeString() string {
+	return RenderTime(t.TargetStartTime)
 }
 
 // StringChildren recurses to print the task
@@ -246,18 +252,21 @@ func (t *Task) SetId(newId string) {
 } */
 
 // Id
+func (t *Task) SetId(newId string) {
+	t.id = newId
+}
 func (t *Task) GetId() string {
-	return t.Id
+	return t.id
 }
 
 // SetState: sets the task state
 func (t *Task) SetState(newState TaskState) {
-	t.State = newState
+	t.state = newState
 }
 
 // State: returns the current state of the task
 func (t *Task) GetState() TaskState {
-	return t.State
+	return t.state
 }
 
 func (t *Task) IsComplete() bool {
@@ -266,12 +275,12 @@ func (t *Task) IsComplete() bool {
 
 // SetName: sets the name field
 func (t *Task) SetName(newName string) {
-	t.Name = newName
+	t.name = newName
 }
 
 // Name: returns the name field
 func (t *Task) GetName() string {
-	return t.Name
+	return t.name
 }
 
 func (t *Task) SetTargetStartTime(start *time.Time) {
@@ -298,13 +307,54 @@ func (t *Task) SetEstimate(estimate time.Duration) {
 func (t *Task) GetEstimate() time.Duration {
 	return t.Estimate
 }
-func (t *Task) SetToday(today bool) {
-	t.Today = today
+
+func (t *Task) FindTag(target string) int {
+	for i, v := range t.tags {
+		if v == target {
+			return i
+		}
+	}
+	return -1
 }
+
+func (t *Task) IsTagSet(target string) bool {
+	return t.FindTag(target) != -1
+}
+
+func (t *Task) SetTag(add string) {
+	if !t.IsTagSet(add) {
+		t.tags = append(t.tags, add)
+	}
+}
+
+func (t *Task) ResetTag(remove string) {
+	i := t.FindTag(remove)
+	if i >= 0 {
+		t.tags = append(t.tags[:i], t.tags[i+1:]...)		
+	}
+}
+
+func (t *Task) ClearTags() {
+	t.tags = nil
+}
+
+func (t *Task) GetAllTags() []string {
+	return t.tags
+}
+
+
+func (t *Task) SetToday(today bool) {
+	if today {
+		t.SetTag("today")
+	} else {
+		t.ResetTag("today")
+	}
+}
+
 func (t *Task) IsToday() bool {
 
 	// if labeled for today, then just return true
-	if t.Today {
+	if t.IsTagSet("today") {
 		return true
 	}
 
@@ -323,6 +373,14 @@ func (t *Task) IsToday() bool {
 
 }
 
+func (t *Task) GetTags() []string {
+	result := make([]string, len(t.tags))
+    for i, v := range t.tags {
+        result[i] = v
+    }
+	return result
+}
+
 /*
 ==================================================================================
  About Weekly Tasks
@@ -335,13 +393,17 @@ func (t *Task) IsToday() bool {
  "picked up" for "this week" if it's target start time is within the
  upcoming Sunday-Saturday weekday.
 ================================================================================*/
-func (t *Task) SetThisWeek(thisWeek bool) {
-	t.ThisWeek = thisWeek
+func (t *Task) SetThisWeek(thisWeekNew bool) {
+	if thisWeekNew {
+		t.SetTag("thisweek")
+	} else {
+		t.ResetTag("thisweek")
+	}
 }
 
 func (t *Task) IsThisWeek() bool {
 	// if labeled for this week, then just return true
-	if t.ThisWeek {
+	if t.IsTagSet("thisweek") {
 		return true
 	}
 
@@ -368,12 +430,16 @@ func (t *Task) IsThisWeek() bool {
 	return isThisWeek
 }
 
-func (t *Task) SetDontForget(dontForget bool) {
-	t.DontForget = dontForget
+func (t *Task) SetDontForget(dontForgetNew bool) {
+	if dontForgetNew {
+		t.SetTag("dontforget")
+	} else {
+		t.ResetTag("dontforget")
+	}
 }
 
 func (t *Task) IsDontForget() bool {
-	return t.DontForget;
+	return t.IsTagSet("dontforget");
 }
 
 // IsMemoryOnly: returns memory-only state indicating
@@ -454,6 +520,18 @@ func (t Task) FindParent(id string) *Task {
 }
 
 
+func (t Task) FindDescendent(id string) *Task {
+	for _, curr := range t.kids {
+		if id == curr.GetId() {
+			return curr
+		}
+		if curr.HasChildren() {
+			return curr.FindDescendent(id)
+		}
+	}
+	return nil
+}
+
 // CurrentParent: returns the first parent found with its
 // current flag set to true.  Used by UIs to track a
 // particular path through the parent / child chain
@@ -465,6 +543,14 @@ func (t *Task) CurrentParent() *Task {
 		}
 	}
 	return nil
+}
+
+func (t *Task) GetParentIds() []string {
+	ids := make([]string, len(t.parents))
+    for i, v := range t.parents {
+        ids[i] = v.GetId()
+    }
+    return ids
 }
 
 

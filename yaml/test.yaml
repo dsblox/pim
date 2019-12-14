@@ -1,0 +1,11 @@
+# test yaml file for pim - to try things out
+
+tasks:
+- { id: 8,   name: Make YAML even work, state: 2, estimate: 60, tags: ['today', 'thisweek'] }
+- { id: 1,   name: Make YAML Parser,     state: 2, estimate: 120,                                            tags: [today] }
+- { id: 2,   name: Crossword with Sandy, state: 0, estimate: 45,  targetStartTime: 2019-10-14T01:00:00,      tags: [today] }
+- { id: 3,   name: Clean Kitchen,        state: 1,  estimate: 30,  actualCompletionTime: 2019-10-13T15:15:00, tags: [today] }
+- { id: 301, parents: [3], name: Empty Dishwasher, state: 1, estimate: 10, actualCompletionTime: 2019-10-13T15:00:00, tags: [today] }
+- { id: 302, parents: [3,5], name: Clean Dishes and Bottles, state: 1, estimate: 15, actualCompletionTime: 2019-10-13T15:15:00, tags: [] }
+
+

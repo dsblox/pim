@@ -60,7 +60,7 @@ var routes = Routes{
         "TaskUpdate",
         "PATCH",
         "/tasks/{taskId}",
-        TaskReplace,
+        TaskUpdate,
     },
     Route{
         "TaskDelete",

@@ -1,0 +1,7 @@
+tasks:
+- {id: 8, parents: [6c531c96-cbcb-4f14-b4af-b501a126e8e5], name: Make YAML work, state: 0, estimate: 60, tags: ['today'], targetstarttime: 2019-12-15T01:00:00Z, actualstarttime: null, actualcompletiontime: null }
+- {id: 1, parents: [6c531c96-cbcb-4f14-b4af-b501a126e8e5], name: Make YAML Parser, state: 0, estimate: 60, tags: ['today'], targetstarttime: null, actualstarttime: null, actualcompletiontime: null }
+- {id: 2, parents: [6c531c96-cbcb-4f14-b4af-b501a126e8e5], name: Crossword with Sandy, state: 1, estimate: 45, tags: ['today'], targetstarttime: null, actualstarttime: null, actualcompletiontime: 2019-12-14T20:21:49Z }
+- {id: 3, parents: [6c531c96-cbcb-4f14-b4af-b501a126e8e5], name: Clean Kitchen, state: 0, estimate: 45, tags: ['today'], targetstarttime: 2019-12-14T21:00:00Z, actualstarttime: null, actualcompletiontime: null }
+- {id: 301, parents: [3], name: Empty Dishwasher, state: 0, estimate: 10, tags: ['today'], targetstarttime: null, actualstarttime: null, actualcompletiontime: null }
+- {id: 302, parents: [3], name: Clean Dishes and Bottles, state: 0, estimate: 15, tags: [], targetstarttime: null, actualstarttime: null, actualcompletiontime: null }

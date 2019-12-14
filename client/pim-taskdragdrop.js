@@ -20,8 +20,8 @@ function drop(ev) {
 
     var from_id = ev.dataTransfer.getData("id");
     var to_id = ev.target.id;
-    console.log(from_id);
-    console.log(to_id);
+    // console.log(from_id);
+    // console.log(to_id);
     dragDropTask(from_id, to_id);
 }
 
@@ -45,10 +45,10 @@ function dragDropTask(idDropped, idOn) {
   // if to/from are different and target list is "DONE" then complete the task
   if (toList == done && toList != fromList) {
     // complete the task
-    console.log("this drop will soon complete the task");
     fromList.removeTask(dropped);
     dropped.state = TaskState.COMPLETE;
     toList.insertTask(dropped, idOn);
+    dropped.dirty = ["state"];
     updateTask(dropped);
   }
 

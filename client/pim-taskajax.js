@@ -31,6 +31,18 @@ function killTask(task) {
 // or one with an id to update an existing task on the server
 function writeTask(task, directive) {
 
+  // convert booleans to tags - not that updates must be done by callers
+  // since this code cannot know what has actually changed.
+  if (directive == "POST" || directive == "PUT") {
+    task.tags = [];
+    if (task.isToday()) {
+      task.tags.push("today");
+    }
+    if (task.isThisWeek()) {
+      task.tags.push("thisweek");
+    }
+  }
+
   // collect the task from the form elements
   var id = "";
   if (directive == "POST") {
@@ -87,9 +99,21 @@ function createTask(task) {
   console.log("createTask: new task id=" + task.id);
 }
 
+// before calling this function, called should set any of:
+// task.dirty[] - field names that changed
+// task.setTags[] - tags to set to true
+// task.resetTags[] = tags to set to false
 function updateTask(task) {
   if (task == null || task.id == null || task.id == "") {
     console.log("error: id must be specified on update.  aborting update.");
+    return;
+  }
+  writeTask(task, "PATCH");
+}
+
+function replaceTask(task) {
+  if (task == null || task.id == null || task.id == "") {
+    console.log("error: id must be specified on update.  aborting replace.");
     return;
   }
   writeTask(task, "PUT");
@@ -98,6 +122,7 @@ function updateTask(task) {
 function clearToday(task) {
   if (task.isToday()) {
     task.setToday(false);
+    task.resetTags["today"];
     updateTask(task);
   }
 }

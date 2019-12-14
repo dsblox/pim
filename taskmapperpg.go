@@ -190,25 +190,27 @@ func NewTaskDataMapperPostgreSQL(saved bool, dbName string) *TaskDataMapperPostg
 // NewDataMapper() implements for PostgreSQL the ability to return a new
 // and unpersisted instance of the mapper that can later be filled in
 // by the object with the list of saved parent ids
-func (tm TaskDataMapperPostgreSQL) NewDataMapper(dbName string) TaskDataMapper {
-	return NewTaskDataMapperPostgreSQL(false, dbName)
+func (tm TaskDataMapperPostgreSQL) NewDataMapper(storageName string) TaskDataMapper {
+	return NewTaskDataMapperPostgreSQL(false, storageName)
 }
 func (tm TaskDataMapperPostgreSQL) CopyDataMapper() TaskDataMapper {
 	return NewTaskDataMapperPostgreSQL(false, tm.dbName)
 }
 
 // this function is used to update system tags - mapping a boolean that has been set
-// on the task into the task_tags db table
+// on the task into the task_tags db table.  Now that tags are stored as tags in
+// memory as well, we should change this stuff to just dump all the tags into the
+// DB but we need a good way to RESET a tag that was removed.
 func (tm TaskDataMapperPostgreSQL) syncSystemTag(tagBool bool, t *Task, tagName string, tagId int, newTask bool) error {
 	if (tagBool) {
 		_, err := dbExec(env, `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2) 
-			                   ON CONFLICT ON CONSTRAINT pk_tasktags DO NOTHING`, t.Id, tagId)
+			                   ON CONFLICT ON CONSTRAINT pk_tasktags DO NOTHING`, t.GetId(), tagId)
 		if (err != nil)	{ 
-			err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert %s tag over task %s: %s", tagName, t.Name, err))
+			err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert %s tag over task %s: %s", tagName, t.GetName(), err))
 			return err
 		}
 	} else if !newTask {
-		_, err := dbExec(env, `DELETE FROM task_tags WHERE task_id = $1 AND tag_id = $2`, t.Id, tagId)
+		_, err := dbExec(env, `DELETE FROM task_tags WHERE task_id = $1 AND tag_id = $2`, t.GetId(), tagId)
 		if (err != nil)	{ 
 			// eat this error - we always try to delete if system tag is not set on the object
 			// this is dangerous - if other DB errors cause this we will eat the error!
@@ -218,15 +220,15 @@ func (tm TaskDataMapperPostgreSQL) syncSystemTag(tagBool bool, t *Task, tagName 
 }
 
 func (tm TaskDataMapperPostgreSQL) syncSystemTags(t *Task, newTask bool) error {
-	err := tm.syncSystemTag(t.Today, t, "today", 1, newTask)
+	err := tm.syncSystemTag(t.IsTagSet("today"), t, "today", 1, newTask)
 	if (err != nil) {
 		return err;
 	}
-	err = tm.syncSystemTag(t.ThisWeek, t, "thisweek", 2, newTask)
+	err = tm.syncSystemTag(t.IsTagSet("thisweek"), t, "thisweek", 2, newTask)
 	if (err != nil) {
 		return err;
 	}
-	err = tm.syncSystemTag(t.ThisWeek, t, "dontforget", 3, newTask)
+	err = tm.syncSystemTag(t.IsDontForget(), t, "dontforget", 3, newTask)
 	if (err != nil) {
 		return err;
 	}
@@ -244,9 +246,9 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 		// upsert the task itself
 		if tm.loaded {
 			_, err := dbExec(env, `UPDATE tasks SET name = $1, state = $2, target_start_time = $3, actual_start_time = $4, actual_completion_time = $5, estimate_minutes = $6 
-				                   WHERE ID = $7`, t.Name, t.State, t.TargetStartTime, t.ActualStartTime, t.ActualCompletionTime, int(t.Estimate.Minutes()), t.Id)
+				                   WHERE ID = $7`, t.GetName(), t.GetState(), t.TargetStartTime, t.ActualStartTime, t.ActualCompletionTime, int(t.Estimate.Minutes()), t.GetId())
 			if (err != nil) {
-				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to update task %s: %s", t.Name, err))
+				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to update task %s: %s", t.GetName(), err))
 				return err
 			}
 
@@ -258,9 +260,9 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 
 		} else {
 	    	_, err := dbExec(env, `INSERT INTO tasks (id, name, state, target_start_time, actual_start_time, actual_completion_time, estimate_minutes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, 
-	    		             t.Id, t.Name, t.State, t.TargetStartTime, t.ActualStartTime, t.ActualCompletionTime, int(t.Estimate.Minutes()))
+	    		             t.GetId(), t.GetName(), t.GetState(), t.TargetStartTime, t.ActualStartTime, t.ActualCompletionTime, int(t.Estimate.Minutes()))
 			if (err != nil)	{ 
-				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert task %s: %s", t.Name, err))
+				err = errors.New(fmt.Sprintf("tdmp.Save(): Unable to insert task %s: %s", t.GetName(), err))
 				return err
 			}
 
@@ -500,9 +502,9 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 	// log.Printf("LoadChildren(): for parent task %s\n", parent.name)
 	var (
-		id string
-		name string
-		state TaskState
+		dbid string
+		dbname string
+		dbstate TaskState
 		db_target_start_time pq.NullTime
 		db_actual_start_time pq.NullTime
 		db_actual_completion_time pq.NullTime
@@ -540,7 +542,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 
 	// for each child task in the DB
 	for rows.Next() {
-		err := rows.Scan(&id, &name, &state, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes, &db_today, &db_thisweek, &db_dontforget)
+		err := rows.Scan(&dbid, &dbname, &dbstate, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes, &db_today, &db_thisweek, &db_dontforget)
 		if err != nil {
 			log.Printf("tmpg.loadChildren(): row scan failed\n")
 			log.Fatal(err)
@@ -548,7 +550,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 		// log.Printf("LoadChildren(): read id=%s, name=%s\n", id, name)
 
 		// create the child task
-		k := &Task{Id:id, Name:name, State:state}
+		k := &Task{id:dbid, name:dbname, state:dbstate}
 		tm.setTaskFields(k, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes, db_today, db_thisweek, db_dontforget)
 
 		// set the data mapper onto the child indicating that it was loaded from DB
