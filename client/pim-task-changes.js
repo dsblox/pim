@@ -52,7 +52,12 @@ function upsertTask(view) {
     	createTask(t); // create a new task on the server
 
     	if (view == 'planning') {
-    		planWeek.insertTask(t);
+    		if (thisWeek) {
+    			planWeek.insertTask(t);
+    		}
+    		else if (today) {
+    			planDay.insertTask(t);
+    		}
  		}
  		else {
 			var list = stuff;
@@ -131,6 +136,12 @@ function findTaskInPIMList(id, returnType) {
 	}
 	if (!found) {
 		found = findTaskInList(done, id, returnType);
+	}
+	if (!found) {
+		findTaskInList(planWeek, id, returnType);
+	}
+	if (!found) {
+		findTaskInList(planDay, id, returnType);
 	}
 	return found;	
 }
@@ -272,16 +283,34 @@ function toggleTask(task) {
 }
 
 function clearTodayAndList(list) {
-  var len = list.tasks.length;
+  var lenClear = list.tasks.length;
   // go backwards so we can remove items from the end
   // and do the loop for both server and UI
-  for (var i = len - 1; i >= 0; i--) {
-    task = list.tasks[i];
+  for (var idxClear = lenClear - 1; idxClear >= 0; idxClear--) {
+    console.log(list.tasks[idxClear].name);
+    task = list.tasks[idxClear];
     clearToday(task);
     list.removeTask(task);
   }  
 }
 
+function setToday(task) {
+	if (!task.isToday()) {
+		task.setToday(true);
+		planDay.insertTask(task);
+		task.setTags = ['today'];
+		updateTask(task);
+	}
+}
 
+function resetToday(task) {
+	if (task.isToday()) {
+		task.setToday(false);
+		planDay.removeTask(task);
+		task.resetTags = ['today'];
+		task.setTags = [];
+		updateTask(task);
+	}
+}
 
 

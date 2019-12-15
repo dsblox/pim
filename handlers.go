@@ -38,9 +38,9 @@ func (j *TaskJSON) IsDirty(field string) bool {
     return false
 }
 
-// used for Create and Replace only - do not use for update or add an update param
+// used for Create, Update and Replace - go to an in-memory Task from JSON
 func (j *TaskJSON) ToTask(t *Task, update bool) {
-    // t.SetId(j.Id) // should we ever set the id???
+    // t.SetId(j.Id) we don't set the ID, that is done by the server
     if !update || j.IsDirty("name") {
         t.SetName(j.Name)        
     }
@@ -250,10 +250,11 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // create a persistable task in our world
-    var t Task
-    taskJSON.ToTask(&t, false)
-    master.AddChild(&t)
+    // create a persistable task in our world with a unique id
+    t := NewTask(taskJSON.Name)
+    // var t Task
+    taskJSON.ToTask(t, false)
+    master.AddChild(t)
     err := t.Save(true)
     if (err != nil) {
         fmt.Printf("TaskCreate: save failed with errror: %s\n", err)
@@ -265,7 +266,7 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Content-Type", "application/json; charset=UTF-8")
         w.WriteHeader(http.StatusCreated)
         var j TaskJSON
-        j.FromTask(&t)
+        j.FromTask(t)
         if err := json.NewEncoder(w).Encode(j); err != nil {
             panic(err)
         }

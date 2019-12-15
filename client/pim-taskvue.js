@@ -11,7 +11,6 @@ Vue.component('pim-task-name', {
 	props: ['name', 'id'],
 	template: '<a href="#myModal" \
 				        data-toggle="modal" \
-	              data-target="#myModal" \
                 :id="id" \
 	              :data-taskid="id">{{name}}</a>',
 })
@@ -21,8 +20,28 @@ Vue.component('pim-task-estimate', {
 	template: '<span class="badge">{{estimate}}</span>' 
 })
 
-Vue.component('pim-task', {
+Vue.component('pim-task-settoday', {
   props: ['task'],
+  methods: {
+    settoday: function() {
+      setToday(this.task);
+    }
+  },
+  template: '<span class="glyphicon glyphicon-chevron-right" v-on:click="settoday"></span>'
+})
+
+Vue.component('pim-task-resettoday', {
+  props: ['task'],
+  methods: {
+    resettoday: function() {
+      resetToday(this.task);
+    }
+  },
+  template: '<span class="glyphicon glyphicon-chevron-left" v-on:click="resettoday"></span>'
+})
+
+Vue.component('pim-task', {
+  props: ['task', 'week', 'day'],
   methods: {
     toggle: function() {
       this.$emit('toggle', this.task);
@@ -39,6 +58,8 @@ Vue.component('pim-task', {
               </label> \
               <div class="pull-right"> \
                 <pim-task-estimate :estimate="task.estimateString()"></pim-task-estimate> \
+                <pim-task-settoday :task="task" v-if="this.week"></pim-task-settoday> \
+                <pim-task-resettoday :task="task" v-if="this.day && this.task.isThisWeek()"></pim-task-resettoday> \
               </div> \
             </div>'
 })
@@ -48,7 +69,6 @@ Vue.component('pim-add', {
 	props: ['id'],
 	template: '<a href="#myModal" \
 	              data-toggle="modal" \
-	              data-target="#myModal" \
 	              :data-list="id"> + </a>'
 })
 
@@ -69,7 +89,7 @@ Vue.component('pim-clear', {
 // clicked.
 
 Vue.component('pim-task-list', {
-  props: ['taskList', 'title', 'add', 'clear'],
+  props: ['taskList', 'title', 'add', 'clear', 'week', 'day'],
   data: function () {
     return {
       numTasks: this.taskList.tasks.length,
@@ -96,7 +116,7 @@ Vue.component('pim-task-list', {
                  </h4> \
                </div> \
                <div class="list-group container-fluid"> \
-                  <pim-task v-for="task in taskList.tasks" :key="task.id" :task="task" class=list-group-item v-on:toggle="toggle" /> \
+                  <pim-task v-for="task in taskList.tasks" :key="task.id" :task="task" :week="week" :day="day" class=list-group-item v-on:toggle="toggle" /> \
               </div> \
              </div>'
 })

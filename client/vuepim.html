@@ -54,7 +54,7 @@
 <div id="pim-root" class="container-fluid">
 
 <h1 class="text-center bg-primary lead">
-	TODAY: Work on PIM UI
+	TODAY
 	<button type="button" class="btn btn-xs btn-primary" data-toggle="modal" data-target="#myModal">
   		<span class="glyphicon glyphicon-plus"></span>&nbsp;
 	</button>
@@ -137,6 +137,10 @@ $('#myModal').on('show.bs.modal', function (event) {
   	var button = $(event.relatedTarget) // Button that triggered the modal
   	currList = taskListFromID(button.data('list')) // Extract info from data-* attributes
   	currTask = findTask(button.data('taskid'))
+    console.log("taskid = " + button.data('taskid'));
+    console.log("button" , button);  
+
+
 
   	// initialize or clear the modal's form fields
   	var title = null;

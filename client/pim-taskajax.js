@@ -122,9 +122,26 @@ function replaceTask(task) {
 function clearToday(task) {
   if (task.isToday()) {
     task.setToday(false);
-    task.resetTags["today"];
+    task.resetTags = ["today"];
+    task.setTags = [];
     updateTask(task);
   }
+}
+
+function findTag(taskJSON, tag) {
+  len = taskJSON.tags.length;
+  idx = 0;
+  found = false;
+  while (!found && idx < len) {
+    found = (taskJSON.tags[idx] == tag);
+    idx++;
+  }
+  return found;
+}
+
+function loadTags(taskJSON, taskJS) {
+  taskJS.setToday(findTag(taskJSON, "today"));
+  taskJS.setThisWeek(findTag(taskJSON, "thisweek"));
 }
 
 // call the server to get our initial list of tasks
@@ -146,6 +163,7 @@ function loadTasks() {
             t.state = task.state; // see mapping in TaskState enum
             t.setTargetStartTime(stringToDate(task.targetStartTime));
             t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+            loadTags(task, t);
             if (t.isComplete()) {
               done.insertTask(t);
             }
@@ -184,6 +202,7 @@ function loadTasksToday() {
             t.state = task.state; // see mapping in TaskState enum
             t.setTargetStartTime(stringToDate(task.targetStartTime));
             t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+            loadTags(task, t);
             if (t.isComplete()) {
               done.insertTask(t, 'actualendtime');
             }
@@ -205,6 +224,7 @@ function loadTasksToday() {
 
 // call the server to get the list of tasks for this week
 function loadTasksThisWeek() {
+  console.log("loadTasksThisWeek() - entry");
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
@@ -213,6 +233,7 @@ function loadTasksThisWeek() {
 
         for (i = 0; i < tasks.length; i++) {
           task = tasks[i];
+          console.log(task.id);
           t = new Task(task.id, 
                        task.name, 
                        null, // stringToDate(task.getTargetStartTime()), 
@@ -223,12 +244,14 @@ function loadTasksThisWeek() {
           t.state = task.state; // see mapping in TaskState enum
           t.setTargetStartTime(stringToDate(task.targetStartTime));
           t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+          loadTags(task, t);
           planWeek.insertTask(t);
         }
       }
     }
   };
   ajaxGet(ajax, tasksThisWeekURL());
+  console.log("loadTasksThisWeek() - exit");  
 }
 
 // call the server to get the list of tasks for this day's planning view
@@ -251,6 +274,7 @@ function loadTasksThisDay() {
           t.state = task.state; // see mapping in TaskState enum
           t.setTargetStartTime(stringToDate(task.targetStartTime));
           t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+          loadTags(task, t);
           planDay.insertTask(t);
         }
       }
@@ -282,6 +306,7 @@ function loadTasksByDay(date) {
             t.state = task.state; // see mapping in TaskState enum
             t.setTargetStartTime(stringToDate(task.targetStartTime));
             t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+            loadTags(task, t);
 
             // currday is bound to vue so updating it updates the display
             currday.insertTask(t);

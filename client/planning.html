@@ -55,20 +55,17 @@
 
 <h1 class="text-center bg-primary lead">
 	Daily Planning
-	<button type="button" class="btn btn-xs btn-primary" data-toggle="modal" data-target="#myModal">
-  		<span class="glyphicon glyphicon-plus"></span>&nbsp;
-	</button>
 </h1>
 
 <div class="row">
 
   <div class="col-sm-6">
-    <pim-task-list :task-list="planWeek" title="Weekly Goals" add="true" v-on:toggle="adjustTask" />
+    <pim-task-list :task-list="planWeek" title="Weekly Goals" add="true" week="true" v-on:toggle="adjustTask" />
   </div>
 
 
   <div class="col-sm-6">
-    <pim-task-list :task-list="planDay" title="Daliy Goals" add="true" v-on:toggle="adjustTask" />
+    <pim-task-list :task-list="planDay" title="Daliy Goals" add="true" day="true" v-on:toggle="adjustTask" />
   </div>
 
 </div>
@@ -104,6 +101,7 @@
             <label for="durartion">Estimate (minutes):</label>
             <input type="number" class="form-control" id="duration">
           </div>
+          <input type="hidden" id="today" value="false">
           <input type="hidden" id="thisweek" value="true">
         </div>
         <div class="modal-footer">
@@ -132,8 +130,10 @@ $('#myModal').on('show.bs.modal', function (event) {
   	var button = $(event.relatedTarget); // Button that triggered the modal
   	currList = taskListFromID(button.data('list')) // Extract info from data-* attributes
   	currTask = findTask(button.data('taskid'));
-    console.log(button.data('list'));
-    console.log(currList.numTasks());
+    console.log("button.text = " + button.text);
+    console.log("button" , button);    
+    console.log("taskid = " + button.data('taskid'));
+    // console.log(currList.numTasks());
 
   	// initialize or clear the modal's form fields
   	var title = null;
@@ -146,12 +146,17 @@ $('#myModal').on('show.bs.modal', function (event) {
   		f.elements["duration"].value = currTask.estimate;  	
   		f.elements["delete"].style.visibility = 'visible';
 
-  	} else {
+  	} 
+    else if (currList != null) {
       if (currList.getId() == "PW") {
   		  title = "Create New Week-Level Task";
+        f.elements["thisweek"].value = true;
+        f.elements["today"].value = false;
       }
       else if (currList.getId() == "PD") {
         title = "Create New Day-Level Task";
+        f.elements["thisweek"].value = false;
+        f.elements["today"].value = true;
       }
       else {
         title = "Create New Task";        
