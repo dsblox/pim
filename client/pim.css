@@ -1,0 +1,18 @@
+.alert-float {
+    height: auto;
+    max-width: 500px;
+    top: 0;
+    margin: 0 auto;
+    padding-top: 10px;
+}
+
+.alert {
+  margin-bottom: 1px;
+  line-height: 30px;
+  height: 30px;
+  padding-top: 0px;
+}
+
+.close {
+	margin-top: 4px;
+}

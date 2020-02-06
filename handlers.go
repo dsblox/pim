@@ -98,12 +98,13 @@ func fromTasks(ts Tasks) []TaskJSON {
 
 
 func errorResponse(w http.ResponseWriter, e PimError) {
-  w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-  w.WriteHeader(e.Response) // file not found - is this right for not finding the id?
-  if err := json.NewEncoder(w).Encode(e); err != nil {
-    panic(err)
-  }
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.WriteHeader(e.Response) // file not found - is this right for not finding the id?
+    if err := json.NewEncoder(w).Encode(e); err != nil {
+        panic(err)
+    }
 }
+
 
 
 // these are all testing using repo.go instead of our
@@ -119,12 +120,12 @@ func Index(w http.ResponseWriter, r *http.Request) {
 }
 
 func TaskIndex(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-    w.WriteHeader(http.StatusOK)
     if master.HasChildren() {
 
         // convert kids to JSON-ready tasks
         kids := fromTasks(master.Kids())
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        w.WriteHeader(http.StatusOK)
 
         if err := json.NewEncoder(w).Encode(kids); err != nil {
             panic(err)
@@ -159,14 +160,13 @@ func TaskFind(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
     strDate := vars["date"]
     date, _ := time.Parse("2006-01-02", strDate)
-    fmt.Println("TaskFind(date=", date, ")")
     if !date.IsZero() {
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-        w.WriteHeader(http.StatusOK)
         if master.HasChildren() {
             matching := master.Kids().FindByCompletionDate(date)
             if len(matching) > 0 {
                 send := fromTasks(matching)
+                w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+                w.WriteHeader(http.StatusOK)
                 if err := json.NewEncoder(w).Encode(send); err != nil {
                     panic(err)
                 }
@@ -185,13 +185,12 @@ func TaskFind(w http.ResponseWriter, r *http.Request) {
 
 // TBD: combined with TaskFind
 func TaskFindToday(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-    w.WriteHeader(http.StatusOK)
     if master.HasChildren() {
         matching := master.Kids().FindToday()
-        fmt.Printf("TaskFindToday() num matching = %d\n", len(matching))
         if len(matching) > 0 {
             send := fromTasks(matching)
+            w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+            w.WriteHeader(http.StatusOK)
             if err := json.NewEncoder(w).Encode(send); err != nil {
                 panic(err)
             }
@@ -205,13 +204,12 @@ func TaskFindToday(w http.ResponseWriter, r *http.Request) {
 
 // TBD: combined with TaskFind
 func TaskFindThisWeek(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-    w.WriteHeader(http.StatusOK)
     if master.HasChildren() {
         matching := master.Kids().FindThisWeek()
-        fmt.Printf("TaskFindThisWeek() num matching = %d\n", len(matching))
         if len(matching) > 0 {
             send := fromTasks(matching)
+            w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+            w.WriteHeader(http.StatusOK)
             if err := json.NewEncoder(w).Encode(send); err != nil {
                 panic(err)
             }
@@ -269,7 +267,7 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
         j.FromTask(t)
         if err := json.NewEncoder(w).Encode(j); err != nil {
             panic(err)
-        }
+        }        
     }
 }
 

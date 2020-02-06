@@ -129,13 +129,15 @@ function clearToday(task) {
 }
 
 function findTag(taskJSON, tag) {
-  len = taskJSON.tags.length;
-  idx = 0;
   found = false;
-  while (!found && idx < len) {
-    found = (taskJSON.tags[idx] == tag);
-    idx++;
-  }
+  if (taskJSON.tags !== null) {
+    len = taskJSON.tags.length;
+    idx = 0;
+    while (!found && idx < len) {
+      found = (taskJSON.tags[idx] == tag);
+      idx++;
+    }
+  }  
   return found;
 }
 
@@ -178,6 +180,9 @@ function loadTasks() {
         }
       }
     }
+    else {
+      pimAjaxError(this.responseText);      
+    }
   };
   ajaxGet(ajax, tasksURL());
 }
@@ -216,6 +221,9 @@ function loadTasksToday() {
             }
         }
       }
+      else {
+        pimAjaxError(this.responseText); 
+      }
     }
   };
   ajaxGet(ajax, tasksTodayURL());
@@ -248,6 +256,9 @@ function loadTasksThisWeek() {
           planWeek.insertTask(t);
         }
       }
+      else {
+        pimAjaxError(this.responseText); 
+      }
     }
   };
   ajaxGet(ajax, tasksThisWeekURL());
@@ -278,6 +289,9 @@ function loadTasksThisDay() {
           planDay.insertTask(t);
         }
       }
+      else {
+        pimAjaxError(this.responseText); 
+      }
     }
   };
   ajaxGet(ajax, tasksTodayURL());
@@ -295,7 +309,8 @@ function loadTasksByDay(date) {
     if (this.readyState == 4) {
       if (this.status == 200) {
         tasks = JSON.parse(this.responseText);
-        for (i = 0; i < tasks.length; i++) {
+        if (tasks !== null) {
+          for (i = 0; i < tasks.length; i++) {
             task = tasks[i];
             t = new Task(task.id, 
                          task.name, 
@@ -310,7 +325,14 @@ function loadTasksByDay(date) {
 
             // currday is bound to vue so updating it updates the display
             currday.insertTask(t);
+          } /* for each task returned */
+        } /* if we could parse the response into tasks */
+        else {
+          pimShowError("internal error: could not parse response: " + this.responseText);
         }
+      }
+      else {
+        pimAjaxError(this.responseText);
       }
     }
   };

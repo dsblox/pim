@@ -21,6 +21,10 @@
 <!-- script src="https://unpkg.com/lodash@4.13.1/lodash.min.js"></script -->
 <!-- script src="https://cdnjs.cloudflare.com/ajax/libs/vue-strap/1.1.29/vue-strap.min.js"></script -->
 
+<!-- my CSS overrides -->
+<link rel="stylesheet" href="pim.css">
+<script src="pim-bootstrap.js"></script>
+
 <!-- The following must be in order - look for a new tool to improve this -->
 <script src="pim-ajax.js"></script>
 <script src="pim-task.js"></script>
@@ -44,6 +48,16 @@
       <li><a href="whatidid.html">History</a></li> 
       <li><a href="#">Mission</a></li> 
     </ul>
+    <ul class="nav navbar-nav nav-center">
+        <div class="alert-float" style="position: absolute; top: 0; left: 10px; right: 10px; z-index: 9999; width: 100%" id="err">
+          <div class="alert alert-danger alert-dismissible show" role="alert" id=errortext>
+            OK
+            <button type="button" class="close" aria-label="Close" onclick="$('#err').hide()">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+        </div>
+    </ul>    
     <ul class="nav navbar-nav navbar-right">
       <li><a href="#"><span class="glyphicon glyphicon-user"></span> Sign Up</a></li>
       <li><a href="#"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
@@ -75,6 +89,7 @@
   <div class="col-sm-4">
     <pim-task-list :task-list="done" title="Done" clear="true" v-on:toggle="adjustTask" />
   </div>
+
 </div>
 
 </div>
@@ -123,6 +138,17 @@
 
 
 <script>
+
+// error block in center of nav to display dismissable errors
+// leaving the text-set here to remind me that the hide/show is
+// on a different element than the text itself.  Note the alert()
+// call resets the close box.  Danger - close() currently deletes
+// the alert - we just want it to hide on clicking the x.
+// I'm not actually using this yet - but it's here when I need it
+$('#err').hide();
+// pimShowError("my error text");
+// $('#err').show();
+
 
 
 // handle the DISPLAY of the New/Edit Modal Dialog

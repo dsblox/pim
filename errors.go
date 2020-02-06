@@ -1,6 +1,7 @@
 package main
 
 import (
+    "net/http"
 )
 
 type PimErrId int
@@ -34,8 +35,8 @@ type PimErrors []PimError
 
 
 var pimErrors = PimErrors {
-	PimError{ Code:success,    Msg:"pim: success",                    Response:200},
-    PimError{ Code:notFound,   Msg:"pim: requested taskid not found", Response:404},
-    PimError{ Code:emptyList,  Msg:"pim: empty task list",            Response:404},
-    PimError{ Code:badRequest, Msg:"pim: could not process request",  Response:422},
+	PimError{ Code:success,    Msg:"pim: success",                    Response:http.StatusOK},
+    PimError{ Code:notFound,   Msg:"pim: requested taskid not found", Response:http.StatusNotFound},
+    PimError{ Code:emptyList,  Msg:"pim: empty task list",            Response:http.StatusNotFound},
+    PimError{ Code:badRequest, Msg:"pim: could not process request",  Response:http.StatusUnprocessableEntity},
 }

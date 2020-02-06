@@ -27,6 +27,14 @@ var stateStrings = []string{"notStarted", "complete", "inProgress", "onHold"} //
 func (ts TaskState) String() string {
 	return stateStrings[ts]
 }
+func TaskStateFromString(s string) TaskState {
+	for i, curr := range stateStrings {
+		if curr == s {
+			return TaskState(i)
+		}
+	}
+	return notStarted
+}
 
 // for persistence we have a mapper interface that can
 // be implemented differently depending on the backend
@@ -87,18 +95,13 @@ func (list Tasks) FindById(id string) *Task {
 func (list Tasks) FindByCompletionDate(date time.Time) Tasks {
 	var result Tasks
 	dayToFind := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-	fmt.Println("Task:FindByCompletionDate(done.Location=", date.Location(), ")")
-	fmt.Println("Task:FindByCompletionDate(seeking date=", dayToFind, ")")
-	fmt.Println("Task:FindByCompletionDate(tasks provided=", len(list), ")")
 
 	for _, curr := range list {
 		done := curr.GetActualCompletionTime()
-		fmt.Println("Task:FindByCompletionDate(curr=", curr, ")")
 		if done != nil {
 			// note: location should be done.Location() - but set to date for now to make it match
 			// for now we'll assume all dates are UTC and that is what is passed in
 			dayOfTask := time.Date(done.Year(), done.Month(), done.Day(), 0, 0, 0, 0, date.Location())
-			fmt.Println("Task:FindByCompletionDate(dayOfTask=", dayOfTask, ")")
 			if dayToFind == dayOfTask {
 				result = append(result, curr)
 			}
@@ -545,10 +548,12 @@ func (t *Task) CurrentParent() *Task {
 	return nil
 }
 
-func (t *Task) GetParentIds() []string {
+func (t *Task) GetParentIds(includeMemoryOnly bool) []string {
 	ids := make([]string, len(t.parents))
     for i, v := range t.parents {
-        ids[i] = v.GetId()
+    	if includeMemoryOnly || !v.IsMemoryOnly() {
+        	ids[i] = v.GetId()
+    	}
     }
     return ids
 }

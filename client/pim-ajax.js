@@ -84,6 +84,9 @@ function loadTask(id) {
         document.getElementById("detail.name").value = task.name;
         document.getElementById("detail.state").value = task.State;
       }
+      else {
+        pimShowError(this.responseText);
+      }
     }
   };
   ajaxGet(ajax, tasksURL(id));
@@ -113,8 +116,9 @@ function writeTask(directive) {
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
       displayRawResponse(this.status, this.responseText);
-      if (this.status == 200) {
-        // successful - should we do something?
+      if (this.status != 200) {
+        // post server errors to our error screen
+        pimShowError(this.responseText);
       }
     }
   };
@@ -150,8 +154,8 @@ function deleteTask() {
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
       displayRawResponse(this.status, this.responseText);
-      if (this.status == 200) {
-        // successful - should we do something?
+      if (this.status != 200) {
+        pimShowError(this.responseText);
       }
     }
   };

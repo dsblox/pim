@@ -22,7 +22,7 @@ type TaskDataMapperYAML struct {
 type TaskYAML struct {
 	Id string
 	Name string
-	State string 					// notStarted, completed, inProgress, onHold
+	State string					// notStarted, completed, inProgress, onHold
 	TargetStartTime *time.Time 		// targeted start time of the task
 	ActualStartTime *time.Time 		// actual start time of the task
 	ActualCompletionTime *time.Time // time task is marked done
@@ -76,14 +76,15 @@ func TimeYAML(t* time.Time) string {
 }
 
 func (tm *TaskDataMapperYAML) writeTask(f *os.File , t *Task) error {
-	var parentIds []string = t.GetParentIds()
+	var parentIds []string = t.GetParentIds(false)
 	var estimate int = int(t.Estimate.Minutes())
 	var tags []string = t.GetTags()
 	strTags := ""
 	if len(tags) > 0 {
 		strTags = "'" + strings.Join(tags, "', '") + "'"
 	}
-	_, err := fmt.Fprintf(f, "- {id: %s, parents: %v, name: %s, state: %d, estimate: %d, tags: [%s], targetstarttime: %s, actualstarttime: %s, actualcompletiontime: %s }\n", 
+
+	_, err := fmt.Fprintf(f, "- {id: %s, parents: %v, name: %s, state: %s, estimate: %d, tags: [%s], targetstarttime: %s, actualstarttime: %s, actualcompletiontime: %s }\n", 
 		                  t.GetId(), parentIds, t.GetName(), t.GetState(), estimate, strTags, 
 		                  TimeYAML(t.GetTargetStartTime()),
 		              	  TimeYAML(t.GetActualStartTime()),
@@ -165,6 +166,8 @@ func (tm *TaskDataMapperYAML) addChildTask(parent* Task, yt* TaskYAML) (error, *
 	child.ActualStartTime = yt.ActualStartTime
 	child.ActualCompletionTime = yt.ActualCompletionTime
 	child.TargetStartTime = yt.TargetStartTime
+	child.SetState(TaskStateFromString(yt.State))
+	/*
 	switch yt.State {
 		case "notStarted": child.SetState(notStarted)
 		case "complete": child.SetState(complete)
@@ -172,6 +175,7 @@ func (tm *TaskDataMapperYAML) addChildTask(parent* Task, yt* TaskYAML) (error, *
 		case "onHold": child.SetState(onHold)
 		default: child.SetState(notStarted)
 	}
+	*/
 
 	for _,v := range yt.Tags {
 		child.SetTag(v)
@@ -217,12 +221,20 @@ func (tm *TaskDataMapperYAML) Load(t *Task, loadChildren bool, root bool) error 
 	var yamlTasks TasksYAML
 	source := []byte(data) 
     err = yaml.Unmarshal(source, &yamlTasks)
-    // TBD: handle these errors - as is, we can fatal on any parsing error!
     if err != nil {
-        log.Fatalf("error: %v", err)
+
+    	// if we hit an error, we report it to the console and stop
+    	// processing - but we may have partially loaded the file
+    	// up until the error was hit.
+
+	    // for now log the error and continue - not sure what more robust
+	    // action we could take (maybe find a way to skip the bad line and
+	   	// continue parsing - or set a flag so the UI can let users know
+	   	// the file wasn't fully loaded?)
+        log.Printf("YAML parsing error: %v", err)
     }
  
-    // fmt.Printf("--- YAML Tasks:\n%+v\n\n", yamlTasks)
+    // log.Printf("--- YAML Tasks:\n%+v\n\n", yamlTasks)
 
     // convert yaml tasks into real tasks
     for _, v := range yamlTasks.Tasks {
