@@ -27,6 +27,11 @@ type TaskDataMapperPostgreSQL struct {
 	dbName string
 	id int // can we get rid of both of these id and parentIds?
 	parentIds []string
+	err error
+}
+
+func (tm *TaskDataMapperPostgreSQL) Error() error {
+	return tm.err
 }
 
 // TBD: 8/16/16...
@@ -184,7 +189,7 @@ func NewTaskDataMapperPostgreSQL(saved bool, dbName string) *TaskDataMapperPostg
 	} // if we need to initialize the db
 
 	// create and return the mapper object
-	return &TaskDataMapperPostgreSQL{loaded:saved,dbName:dbName}
+	return &TaskDataMapperPostgreSQL{loaded:saved,dbName:dbName, err:nil}
 }
 
 // NewDataMapper() implements for PostgreSQL the ability to return a new

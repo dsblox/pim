@@ -68,4 +68,9 @@ var routes = Routes{
         "/tasks/{taskId}",
         TaskDelete,
     },
-}
+    Route{
+        "ServerStatus",
+        "GET",
+        "/status",
+        ServerStatus,
+    },}

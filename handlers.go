@@ -112,7 +112,14 @@ func errorResponse(w http.ResponseWriter, e PimError) {
 // handlers into our actual task objects.
 // built this from this blog: http://thenewstack.io/make-a-restful-json-api-go/
 
-
+func ServerStatus(w http.ResponseWriter, r *http.Request) {
+    err := master.MapperError()
+    if err == nil {
+        fmt.Fprintln(w, "OK")
+    } else {
+        fmt.Fprintln(w, err)
+    }
+}
 
 
 func Index(w http.ResponseWriter, r *http.Request) {

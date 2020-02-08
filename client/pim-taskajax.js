@@ -223,6 +223,10 @@ function loadTasksToday() {
       }
       else {
         pimAjaxError(this.responseText); 
+        // if we got an empty list, let's ask the server for it's status to
+        // see if there is a better explanation besides "empty list"
+        // that we share with the user.
+        serverStatus();
       }
     }
   };

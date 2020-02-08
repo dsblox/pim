@@ -14,6 +14,10 @@ function tasksURL(id = "") {
   return makeURL(rest)
 }
 
+function serverStatusURL() {
+  return makeURL("status")
+}
+
 function tasksTodayURL() {
   return makeURL("tasks/today")
 }
@@ -71,6 +75,16 @@ function ajaxPost(xmlhttp, url, payload) {
 
 function ajaxPut(xmlhttp, url, payload) {
   ajaxPayload(xmlhttp, url, payload, "PUT");
+}
+
+function serverStatus() {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.responseText != "OK") {
+      pimShowError(this.responseText);      
+    }
+  };
+  ajaxGet(ajax, serverStatusURL());  
 }
 
 function loadTask(id) {

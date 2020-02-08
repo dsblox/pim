@@ -47,6 +47,7 @@ type TaskDataMapper interface {
 	Save(t *Task, saveChildren bool, saveMyself bool) error            // save a task - just the task and parent relationships
 	Load(t *Task, loadChildren bool, root bool) error 		   // load a task - and all its children (note lack of symmetry)
 	Delete(t *Task, p *Task) error // delete a task - optionally reparenting its children
+	Error() error // returns nil if the mapper is in a non-error state, or an error if in an error state
 }
 
 // Task: our central type for the whole world here - will become quite large over time
@@ -89,7 +90,6 @@ func (list Tasks) FindById(id string) *Task {
 	}
 	return nil
 }
-
 
 // Find all tasks in the list that have the specified completion date (ignore time)
 func (list Tasks) FindByCompletionDate(date time.Time) Tasks {
@@ -159,6 +159,10 @@ func NewTask(newName string) *Task {
 func NewTaskMemoryOnly(newName string) *Task {
 	newId,_ := uuid.NewV4()
 	return &Task{id:newId.String(), name:newName, state:notStarted, memoryonly:true}	
+}
+
+func (t *Task) MapperError() error {
+	return t.persist.Error()
 }
 
 func (taska *Task) Equal(taskb *Task) bool {

@@ -14,6 +14,7 @@ import (
 // TaskDataMapperYAML implements TaskDataMapper to persist tasks
 type TaskDataMapperYAML struct {
 	fileName string
+	err error  	 					// error state of the data mapper
 }
 
 // Note: struct fields must be public in order for unmarshal to
@@ -50,7 +51,7 @@ type TasksYAML struct {
 // download and go get the uuid library)
 
 func NewTaskDataMapperYAML(fileName string) *TaskDataMapperYAML {
-	return &TaskDataMapperYAML{fileName:fileName}
+	return &TaskDataMapperYAML{fileName:fileName,err:nil}
 }
 
 
@@ -58,12 +59,16 @@ func NewTaskDataMapperYAML(fileName string) *TaskDataMapperYAML {
 // and unpersisted instance of the mapper that can later be filled in
 // by the object with the list of saved parent ids
 func (tm TaskDataMapperYAML) NewDataMapper(fileName string) TaskDataMapper {
-	return &TaskDataMapperYAML{fileName:fileName}
+	return &TaskDataMapperYAML{fileName:fileName,err:nil}
 }
 
 // not sure anymore what CopyDataMapper is for - so this implementation may be wrong
 func (tm TaskDataMapperYAML) CopyDataMapper() TaskDataMapper {
-	return &TaskDataMapperYAML{fileName:tm.fileName}
+	return &TaskDataMapperYAML{fileName:tm.fileName,err:nil}
+}
+
+func (tm *TaskDataMapperYAML) Error() error {
+	return tm.err
 }
 
 func TimeYAML(t* time.Time) string {
@@ -73,6 +78,10 @@ func TimeYAML(t* time.Time) string {
   } else {
   	return "null"
   }
+}
+
+func singleQuoteYAML(raw string) string {
+	return "'" + strings.Replace(raw, "'", "''", -1) + "'"
 }
 
 func (tm *TaskDataMapperYAML) writeTask(f *os.File , t *Task) error {
@@ -85,7 +94,7 @@ func (tm *TaskDataMapperYAML) writeTask(f *os.File , t *Task) error {
 	}
 
 	_, err := fmt.Fprintf(f, "- {id: %s, parents: %v, name: %s, state: %s, estimate: %d, tags: [%s], targetstarttime: %s, actualstarttime: %s, actualcompletiontime: %s }\n", 
-		                  t.GetId(), parentIds, t.GetName(), t.GetState(), estimate, strTags, 
+		                  t.GetId(), parentIds, singleQuoteYAML(t.GetName()), t.GetState(), estimate, strTags, 
 		                  TimeYAML(t.GetTargetStartTime()),
 		              	  TimeYAML(t.GetActualStartTime()),
 		              	  TimeYAML(t.GetActualCompletionTime()))
@@ -224,14 +233,12 @@ func (tm *TaskDataMapperYAML) Load(t *Task, loadChildren bool, root bool) error 
     if err != nil {
 
     	// if we hit an error, we report it to the console and stop
-    	// processing - but we may have partially loaded the file
-    	// up until the error was hit.
-
-	    // for now log the error and continue - not sure what more robust
-	    // action we could take (maybe find a way to skip the bad line and
-	   	// continue parsing - or set a flag so the UI can let users know
-	   	// the file wasn't fully loaded?)
+    	// processing - any error results in the entire file not loading.
+	    // we set the error state on the mapper and allow our caller
+	    // to decide what to do with it.  The task conversion code
+	    // below will simply not be entered with no loaded file.
         log.Printf("YAML parsing error: %v", err)
+        tm.err = err
     }
  
     // log.Printf("--- YAML Tasks:\n%+v\n\n", yamlTasks)
@@ -273,7 +280,7 @@ func (tm *TaskDataMapperYAML) Load(t *Task, loadChildren bool, root bool) error 
     	} // else there are parents to be sought
     }
 
-	return nil
+	return tm.err
 }
 
 // Delete is not supported on the YAML mapper - you can only save or load the entire task list
