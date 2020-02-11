@@ -92,9 +92,11 @@ function deleteTask() {
 	done.removeTask(currTask);
 	stuff.removeTask(currTask);
 	scheduled.removeTask(currTask);
+    planWeek.removeTask(currTask);
+    planDay.removeTask(currTask);
 
-  // delete the task from the server (when we write it)
-  killTask(currTask);
+    // delete the task from the server (when we write it)
+    killTask(currTask);
 
 	// remove what we hope is the last reference to the task
 	currTask = null;

@@ -121,51 +121,33 @@ Vue.component('pim-task-list', {
              </div>'
 })
 
-
-
-
-// trying to create a general datetime control that I can customize for PIM
-// but also be generic for re-use                 
-
-Vue.component('dab-datetime', {
+Vue.component('pim-selector-date', {
   props: ['onchange', 'initTimestamp'],
   data: function() {
     return {
-      // type: "date",
       timestamp: null,
       changeHandler: null
     }
   },
-  methods: {
-    onChanged: function(event) {
-      if (this.changeHandler != null && 
-          typeof this.changeHandler === "function") {
-        this.changeHandler(this.timestamp); // make this send the new date instead of the event
-      }
-    }
-  },
-  created: function () {
-    if (this.onchange !== undefined && this.onchange !== undefined) {
+  created: function() {
+    if (this.onchange !== undefined) {
       this.changeHandler = this.onchange;
     }
     console.log(this.initTimestamp);
     this.timestamp = this.initTimestamp;
   },
-  template: '<div class="form-group"> \
-               <input v-on:change="onChanged" v-model="timestamp" type="date" class="form-control"> \
-             </div>'
-})
-
-Vue.component('pim-selector-date', {
-  props: ['onchange', 'initTimestamp'],
-  created: function() {
-    console.log(this.initTimestamp);
+  methods: {
+    onChanged: function(event) {
+      if (this.changeHandler != null && typeof this.changeHandler === "function") {
+        this.changeHandler(this.timestamp); // make this send the new date instead of the event
+      }
+    }
   },
   template: '<div class="panel panel-primary"> \
                <div class="panel-heading"> \
                  <h4 class="panel-title">Date</h4> \
                </div> \
-               <dab-datetime :onchange="onchange" :init-timestamp="initTimestamp" /> \
+               <v-date-picker mode="single" color="blue" v-on:input="onChanged" is-inline v-model="timestamp" /> \
             </div>'
 })
 
