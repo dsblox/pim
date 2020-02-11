@@ -145,6 +145,33 @@ func (list Tasks) FindDontForget() Tasks {
 	return result
 }
 
+// return a list of all tasks in the list that have a completion date
+// (should we also see if they are marked done? - for now we won't)
+func (list Tasks) FindCompleted() Tasks {
+	var result Tasks
+	for _, curr := range list {
+		if curr.GetActualCompletionTime() != nil {
+			result = append(result, curr)			
+		}
+	}
+	return result
+}
+
+func (list Tasks) FindUniqueCompletionDates() []time.Time {
+	result := make([]time.Time, 0, len(list))
+	m := make(map[time.Time]bool) // use this map to check for uniqueness
+	for _, curr := range list {
+		// strip the time portion off the date
+		t := curr.GetActualCompletionTime()
+		d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+
+		if _, ok := m[d]; !ok {
+			m[d] = true
+			result = append(result, d)
+		}
+	}
+	return result
+}
 
 // NewTask: create a new task with a name, assign a unique id, and default settings
 // When we break Tasks into its own package we will rename this to just "New()"

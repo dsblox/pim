@@ -16,6 +16,8 @@
 <script src='https://unpkg.com/v-calendar@next'></script>
 
 
+
+
 <!-- CDN VERSIONS -->
 <!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" -->
 <!-- link rel="stylesheet" href="https://unpkg.com/bootstrap-datepicker@1.9.0/dist/css/bootstrap-datepicker3.min.css" -->
@@ -38,6 +40,7 @@
 <script src="pim-taskajax.js"></script>
 <script src="pim-task-changes.js"></script>
 <script src="pim-taskdragdrop.js"></script>
+
 
 </head>
 
@@ -79,7 +82,7 @@
 <div class="row">
 
   <div class="col-sm-4">
-    <pim-selector-date :onchange="myDateChanged" :init-timestamp="new Date()" /> 
+    <pim-selector-date :onchange="myDateChanged" :init-timestamp="new Date()" :touchable="completedTaskDates"/> 
   </div>
 
   <div class="col-sm-8">
@@ -93,8 +96,6 @@
 
 <script>
 
-
-
 // error block in center of nav to display dismissable errors
 // leaving the text-set here to remind me that the hide/show is
 // on a different element than the text itself.  Note the alert()
@@ -104,7 +105,7 @@
 $('#err').hide();
 // pimShowError("my error text");
 // $('#err').show();
-  
+
 
 function myDateChanged(newDate) {
   loadTasksByDay(dateToString(newDate));
@@ -112,13 +113,24 @@ function myDateChanged(newDate) {
 
 function dateToString(date) {
   var result = "";
-  result += date.getFullYear();
-  result += "-";
-  result += (date.getMonth() < 9 ? "0" : "") + (date.getMonth() + 1);
-  result += "-";
-  result += (date.getDate() < 10 ? "0" : "") + date.getDate();
+  if (date != null) {
+    result += date.getFullYear();
+    result += "-";
+    result += (date.getMonth() < 9 ? "0" : "") + (date.getMonth() + 1);
+    result += "-";
+    result += (date.getDate() < 10 ? "0" : "") + date.getDate();
+  }
   return result;
 }
+
+// let's get the dates of all completed tasks into an array
+// to link to the calendar, so the calendar will only allow
+// us to click on days with tasks completed on them
+// NOTE: this should be working but I cannot get the V-Calendar's
+// available-dates attribute to be reactive and change after
+// we retrieve this data from the server.  So disabling for now!
+findAllCompletedTaskDates();
+
 
 // start with today - note startDate is used in
 // two places to make this work - as an input to
@@ -130,9 +142,6 @@ var startDate = dateToString(new Date());
 
 // call the server to get tasks and put into the days lists
 loadTasksByDay(startDate);
-
-console.log(currday.title);
-
 
 // here is a root Vue to hold references to my models
 // the data references can be linked to components
@@ -146,9 +155,11 @@ new Vue({
     states: TaskState,
     myDateChanged: myDateChanged,
     startDate: startDate,
+    completedTaskDates: completedTaskDates,
+
     // Data used by the date picker
     mode: 'single',
-    selectedDate: new Date(),    
+    selectedDate: new Date(), 
   },
   methods: {
     adjustTask: function(task) { 
@@ -156,6 +167,7 @@ new Vue({
     }
   },
 })
+
 
 </script>
 </body>

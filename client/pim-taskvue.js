@@ -122,18 +122,17 @@ Vue.component('pim-task-list', {
 })
 
 Vue.component('pim-selector-date', {
-  props: ['onchange', 'initTimestamp'],
+  props: ['onchange', 'initTimestamp', 'touchable'],
   data: function() {
     return {
       timestamp: null,
-      changeHandler: null
+      changeHandler: null,
     }
   },
   created: function() {
     if (this.onchange !== undefined) {
       this.changeHandler = this.onchange;
     }
-    console.log(this.initTimestamp);
     this.timestamp = this.initTimestamp;
   },
   methods: {
@@ -147,8 +146,10 @@ Vue.component('pim-selector-date', {
                <div class="panel-heading"> \
                  <h4 class="panel-title">Date</h4> \
                </div> \
-               <v-date-picker mode="single" color="blue" v-on:input="onChanged" is-inline v-model="timestamp" /> \
+               <v-date-picker mode="single" color="blue" v-on:input="onChanged" is-inline v-model="timestamp" :available-dates="touchable" /> \
             </div>'
 })
+
+
 
 

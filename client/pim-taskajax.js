@@ -163,8 +163,8 @@ function loadTasks() {
                          task.estimate/nSecPerMinute,
                          task.today);
             t.state = task.state; // see mapping in TaskState enum
-            t.setTargetStartTime(stringToDate(task.targetStartTime));
-            t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+            t.setTargetStartTime(stringToDate(task.targetStartTime, true));
+            t.setActualCompletionTime(stringToDate(task.actualCompletionTime, true));
             loadTags(task, t);
             if (t.isComplete()) {
               done.insertTask(t);
@@ -205,8 +205,8 @@ function loadTasksToday() {
                          false, // we set complete state later
                          task.today);
             t.state = task.state; // see mapping in TaskState enum
-            t.setTargetStartTime(stringToDate(task.targetStartTime));
-            t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+            t.setTargetStartTime(stringToDate(task.targetStartTime, true));
+            t.setActualCompletionTime(stringToDate(task.actualCompletionTime, true));
             loadTags(task, t);
             if (t.isComplete()) {
               done.insertTask(t, 'actualendtime');
@@ -254,8 +254,8 @@ function loadTasksThisWeek() {
                        false, // we set complete state later
                        task.today);
           t.state = task.state; // see mapping in TaskState enum
-          t.setTargetStartTime(stringToDate(task.targetStartTime));
-          t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+          t.setTargetStartTime(stringToDate(task.targetStartTime, true));
+          t.setActualCompletionTime(stringToDate(task.actualCompletionTime, true));
           loadTags(task, t);
           planWeek.insertTask(t);
         }
@@ -287,8 +287,8 @@ function loadTasksThisDay() {
                        false, // we set complete state later
                        task.today);
           t.state = task.state; // see mapping in TaskState enum
-          t.setTargetStartTime(stringToDate(task.targetStartTime));
-          t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+          t.setTargetStartTime(stringToDate(task.targetStartTime, true));
+          t.setActualCompletionTime(stringToDate(task.actualCompletionTime, true));
           loadTags(task, t);
           planDay.insertTask(t);
         }
@@ -323,8 +323,8 @@ function loadTasksByDay(date) {
                          task.estimate/nSecPerMinute,
                          task.today);
             t.state = task.state; // see mapping in TaskState enum
-            t.setTargetStartTime(stringToDate(task.targetStartTime));
-            t.setActualCompletionTime(stringToDate(task.actualCompletionTime));
+            t.setTargetStartTime(stringToDate(task.targetStartTime, false));
+            t.setActualCompletionTime(stringToDate(task.actualCompletionTime, false));
             loadTags(task, t);
 
             // currday is bound to vue so updating it updates the display
@@ -341,6 +341,43 @@ function loadTasksByDay(date) {
     }
   };
   ajaxGet(ajax, tasksFindURL(date));
+}
+
+function findAllCompletedTaskDates() {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    uniqueDates = {};
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        tasks = JSON.parse(this.responseText);
+        if (tasks !== null) {
+          for (i = 0; i < tasks.length; i++) {
+            task = tasks[i];
+            timestamp = stringToDate(task.actualCompletionTime, false);
+            if (timestamp != null) {
+              // chopping off time is ignoring timezone and resulting in
+              // the wrong date?  Or is it working and "FindByCompletionDate()"
+              // is ignoring the TZ?
+              completionDate = new Date(timestamp.toDateString()); 
+              if (completionDate != null) {
+                if (!uniqueDates[completionDate]) {
+                  uniqueDates[completionDate] = true;
+                  completedTaskDates.push(completionDate);
+                }
+              }
+            }
+          } /* for each task returned */
+        } /* if we could parse the response into tasks */
+        else {
+          pimShowError("internal error: could not parse response: " + this.responseText);
+        }
+      }
+      else {
+        pimAjaxError(this.responseText);
+      }
+    }
+  };
+  ajaxGet(ajax, tasksCompleteURL());  
 }
 
 

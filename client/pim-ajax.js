@@ -26,6 +26,11 @@ function tasksThisWeekURL() {
   return makeURL("tasks/thisweek")
 }
 
+function tasksCompleteURL() {
+  return makeURL("tasks/complete")
+}
+
+
 
 function tasksFindURL(date) {
   var rest = "tasks";

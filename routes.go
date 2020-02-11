@@ -33,6 +33,12 @@ var routes = Routes{
         TaskFindThisWeek,
     },
     Route{
+        "TaskFindComplete",
+        "GET",
+        "/tasks/complete",
+        TaskFindComplete,
+    },    
+    Route{
         "TaskShow",
         "GET",
         "/tasks/{taskId}",

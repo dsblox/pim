@@ -75,14 +75,16 @@ func (j *TaskJSON) ToTask(t *Task, update bool) {
 }
 
 func (j *TaskJSON) FromTask(t *Task) {
-    j.Id = t.GetId()
-    j.Name = t.GetName()
-    j.State = t.GetState()
-    j.TargetStartTime = t.GetTargetStartTime()
-    j.ActualStartTime = t.GetActualStartTime()
-    j.ActualCompletionTime = t.GetActualCompletionTime()
-    j.Estimate = t.GetEstimate()
-    j.Tags = t.GetAllTags()
+    if t != nil {
+        j.Id = t.GetId()
+        j.Name = t.GetName()
+        j.State = t.GetState()
+        j.TargetStartTime = t.GetTargetStartTime()
+        j.ActualStartTime = t.GetActualStartTime()
+        j.ActualCompletionTime = t.GetActualCompletionTime()
+        j.Estimate = t.GetEstimate()
+        j.Tags = t.GetAllTags()
+    }
 }
 
 // convert a list of tasks to a list of JSON tasks
@@ -121,7 +123,6 @@ func ServerStatus(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-
 func Index(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintln(w, "PIM Task Manager Server")
 }
@@ -146,9 +147,9 @@ func TaskShow(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
     taskId := vars["taskId"]
     t := master.FindChild(taskId)
-    var j TaskJSON
-    j.FromTask(t)
     if t != nil {
+        var j TaskJSON
+        j.FromTask(t)
         w.Header().Set("Content-Type", "application/json; charset=UTF-8")
         w.WriteHeader(http.StatusOK)    
         if err := json.NewEncoder(w).Encode(j); err != nil {
@@ -405,3 +406,23 @@ func TaskDelete(w http.ResponseWriter, r *http.Request) {
         panic(err)
     }
 }
+
+func TaskFindComplete(w http.ResponseWriter, r *http.Request) {
+    if master.HasChildren() {
+        matching := master.Kids().FindCompleted()
+        if len(matching) > 0 {
+            send := fromTasks(matching)
+            w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+            w.WriteHeader(http.StatusOK)
+            if err := json.NewEncoder(w).Encode(send); err != nil {
+                panic(err)
+            }
+        } else {
+            errorResponse(w, pimErr(emptyList))
+        }
+    } else {
+        errorResponse(w, pimErr(emptyList))
+    }
+}
+
+

@@ -11,6 +11,7 @@ planDay.setId("PD");
 
 var days = {};
 var currday = new TaskList();
+var completedTaskDates = [];
 
 function upsertTask(view) {
 	var t = null;
@@ -183,19 +184,21 @@ function extractDateString(timestamp) {
   return strDate;  
 }
 
-function stringToDate(strDate) {
+// set local to true to convert date to local timezone
+// typically we want them in the local time zone when we are in weekly / daily views
+// and we want them in UTC in historical views - though perhaps we should change that?
+function stringToDate(strDate, local) {
   if (strDate == null) {
     return null;
   }
   date = new Date(strDate.substring(0,strDate.length-1));
-  if (strDate.slice(-1) == "Z") { // Z as last char means UTC
+  if ((strDate.slice(-1) == "Z") && (local)) { // Z as last char means UTC
 	var offset = new Date().getTimezoneOffset();
   	date.setMinutes(date.getMinutes() - offset);
   }	
 
   return date;
 }
-
 
 
 function taskListFromID(id) {
