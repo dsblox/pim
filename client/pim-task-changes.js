@@ -10,6 +10,7 @@ var planDay = new TaskList();
 planDay.setId("PD");
 
 var days = {};
+var selectedDate = null;
 var currday = new TaskList();
 var completedTaskDates = [];
 

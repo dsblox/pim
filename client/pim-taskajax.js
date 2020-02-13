@@ -301,6 +301,18 @@ function loadTasksThisDay() {
   ajaxGet(ajax, tasksTodayURL());
 }
 
+function dateToString(date) {
+  var result = "";
+  if (date != null) {
+    result += date.getFullYear();
+    result += "-";
+    result += (date.getMonth() < 9 ? "0" : "") + (date.getMonth() + 1);
+    result += "-";
+    result += (date.getDate() < 10 ? "0" : "") + date.getDate();
+  }
+  return result;
+}
+
 
 // call the server to get just the tasks completed on the date specified
 function loadTasksByDay(date) {
@@ -327,9 +339,16 @@ function loadTasksByDay(date) {
             t.setActualCompletionTime(stringToDate(task.actualCompletionTime, false));
             loadTags(task, t);
 
-            // currday is bound to vue so updating it updates the display
+            // currday is bound to vue task-list so updating it updates the display
             currday.insertTask(t);
+
           } /* for each task returned */
+
+          // selectedDate is bound to vue calendar control so will select the date
+          // this is bullshit - not sure why I have to reach into the view model
+          // and can't just change my JS Date - but I can't.
+          v["selectedDate"] = date;
+
         } /* if we could parse the response into tasks */
         else {
           pimShowError("internal error: could not parse response: " + this.responseText);
@@ -340,13 +359,14 @@ function loadTasksByDay(date) {
       }
     }
   };
-  ajaxGet(ajax, tasksFindURL(date));
+  ajaxGet(ajax, tasksFindURL(dateToString(date)));
 }
 
-function findAllCompletedTaskDates() {
+function findAllCompletedTaskDates(bLoadTasks) {
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     uniqueDates = {};
+    maxDate = null;
     if (this.readyState == 4) {
       if (this.status == 200) {
         tasks = JSON.parse(this.responseText);
@@ -363,10 +383,16 @@ function findAllCompletedTaskDates() {
                 if (!uniqueDates[completionDate]) {
                   uniqueDates[completionDate] = true;
                   completedTaskDates.push(completionDate);
+                  if (maxDate == null || completionDate > maxDate) {
+                    maxDate = completionDate;
+                  }
                 }
               }
             }
           } /* for each task returned */
+          if (bLoadTasks) {
+            loadTasksByDay(maxDate);
+          }
         } /* if we could parse the response into tasks */
         else {
           pimShowError("internal error: could not parse response: " + this.responseText);
