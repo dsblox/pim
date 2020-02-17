@@ -79,7 +79,7 @@ function upsertTask(view) {
 		t.setEstimate(duration);
 		t.setToday(today);
 		t.setThisWeek(thisWeek);
-		moveTask(t);
+		moveTask(t); // adjust the task to show in all the right lists
 		currTask = null;
     	replaceTask(t); // set all the fields on this task
 	}
@@ -216,9 +216,7 @@ function taskListFromID(id) {
 
 // this function is called when a task is marked completed
 // or "unmarked" completed - it moves the task from list
-// to list and if vue works properly it'll be really cool
-// note that we get the event the value on the task hasn't
-// changed yet so we check for the opposite.
+// to list
 // right now it will also make an ajax call to update the task
 // TBD: in today view, when the date of a task changes to another
 //   date then we should remove it from this view entirely.  Not
@@ -227,11 +225,8 @@ function taskListFromID(id) {
 function moveTask(task) {
   if (task == null) { return; }
 
-  // console.log(task.actualCompletionTime);
-  console.log("in moveTask()");
+  console.log("in moveTask(): complete="+task.isComplete());
 
-
-  // task is done
   if (task.isComplete()) {
 
     // make sure it is in the done list
@@ -247,7 +242,6 @@ function moveTask(task) {
 
     // when we update change the state and completion time
     task.dirty = ["state", "actualcompletiontime"];
-
 
   } else {
 
@@ -272,20 +266,24 @@ function moveTask(task) {
 
   // call the server to update the task persistently
   // only changing the state and completion time
-
   updateTask(task);
 }
 
 function toggleTask(task) {
- 	if (task == null) { return; }
+    if (task == null) { return; }
 
-  // note this used to be necessary - but now it isn't
-  // i think vue fixed a bug in the data binding and is
-  // now automatically changing the task value when it
-  // didn't before
-  // task.complete = !task.complete;
+    // change the state of the task
+    // not sure why double-binding doesn't
+    // make this happen automatically
+    if (task.isComplete()) {
+        task.markNotStarted();
+    }
+    else {
+        task.markComplete();
+    }
+    // console.log("toggleTask(): complete="+task.complete)
 
- 	moveTask(task);
+    moveTask(task);
 }
 
 function clearTodayAndList(list) {

@@ -44,6 +44,22 @@ class Task {
     return (this.state == TaskState.COMPLETE);
   }
 
+  markComplete() {
+    this.state = TaskState.COMPLETE;
+  }
+
+  markNotStarted() {
+    this.state = TaskState.NOT_STARTED;    
+  }
+
+  markInProgress() {
+    this.state = TaskState.IN_PROGRESS;        
+  }
+
+  markOnHold() {
+    this.state = TaskState.ON_HOLD;  
+  }
+
   isToday() {
     return this.today;
   }

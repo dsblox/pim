@@ -52,7 +52,7 @@ Vue.component('pim-task', {
               <label :id="task.id" class="col-sm-10"> \
                   <input type="checkbox" :id="task.id" v-model="task.state" id="inner" \
                   	   v-bind:true-value=1 v-bind:false-value=0 \
-                       v-on:click="toggle"> \
+                       v-on:input="toggle"> \
                 	<pim-start-time :task="task"></pim-start-time> \
                 	<pim-task-name :name="task.getName()" :id="task.id"></pim-task-name> \
               </label> \

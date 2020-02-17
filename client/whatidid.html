@@ -10,9 +10,10 @@
 <script src="jquery/3.2.1/jquery.min.js"></script>
 <script src="bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="datepicker/1.9.0/js/bootstrap-datepicker.js"></script>
-<!-- script src="vue/vue.js"></script -->
+<script src="vue/2.6.11/vue.js"></script>
 
-<script src='https://unpkg.com/vue/dist/vue.js'></script>
+
+<!-- installing requires a bunch of dependencies - so I can't use this page offline for now -->
 <script src='https://unpkg.com/v-calendar@next'></script>
 
 
@@ -147,7 +148,7 @@ v = new Vue({
   },
   methods: {
     adjustTask: function(task) { 
-      moveTask(task)
+      toggleTask(task)
     }
   },
 })
