@@ -3,6 +3,7 @@
 var scheduled = new TaskList();
 var stuff = new TaskList();
 var done = new TaskList();
+var inprogress = new TaskList();
 
 var planWeek = new TaskList();
 planWeek.setId("PW");
@@ -239,14 +240,27 @@ function moveTask(task) {
     // if it was in the scheduled or stuff lists remove it
     scheduled.removeTask(task);
     stuff.removeTask(task);
+    inprogress.removeTask(task);
 
     // when we update change the state and completion time
     task.dirty = ["state", "actualcompletiontime"];
 
+  } else if (task.isInProgress()) {
+
+    inprogress.insertTask(task, false);
+    scheduled.removeTask(task);
+    stuff.removeTask(task);
+    done.removeTask(task);
+
+    // when we update change the state and completion time
+    task.dirty = ["state"];
+
+  // else back to not started
   } else {
 
     // remove from done list if it was there
     done.removeTask(task);
+    inprogress.removeTask(task);
 
     // clear any completion time if its not really done
     task.setActualCompletionTime(null);
@@ -315,6 +329,19 @@ function resetToday(task) {
 		task.setTags = [];
 		updateTask(task);
 	}
+}
+
+function startStop(task) {
+    if (task.isInProgress()) {
+        task.markNotStarted();
+    }
+    else if (task.isNotStarted()) {
+        task.markInProgress();
+    }
+    else {
+        return;
+    }
+    moveTask(task);
 }
 
 

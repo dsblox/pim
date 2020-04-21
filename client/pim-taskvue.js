@@ -15,9 +15,9 @@ Vue.component('pim-task-name', {
 	              :data-taskid="id">{{name}}</a>',
 })
 
-Vue.component('pim-task-estimate', {
-	props: ['estimate'],
-	template: '<span class="badge">{{estimate}}</span>' 
+Vue.component('pim-duration', {
+	props: ['duration'],
+	template: '<span v-if="duration" class="badge">{{duration}}</span>' 
 })
 
 Vue.component('pim-task-settoday', {
@@ -40,6 +40,19 @@ Vue.component('pim-task-resettoday', {
   template: '<span class="glyphicon glyphicon-chevron-left" v-on:click="resettoday"></span>'
 })
 
+Vue.component('pim-startstop', {
+  props: ['task'],
+  methods: {
+    startstop: function() {
+      console.log("startstop");      
+      startStop(this.task);
+    }
+  },
+  template: '<span v-if="this.task.isInProgress()" class="glyphicon glyphicon-pause" v-on:click="startstop"></span> \
+             <span v-else-if="!this.task.isComplete()" class="glyphicon glyphicon-flash" v-on:click="startstop"></span>'
+})
+
+
 Vue.component('pim-task', {
   props: ['task', 'week', 'day'],
   methods: {
@@ -57,7 +70,8 @@ Vue.component('pim-task', {
                 	<pim-task-name :name="task.getName()" :id="task.id"></pim-task-name> \
               </label> \
               <div class="pull-right"> \
-                <pim-task-estimate :estimate="task.estimateString()"></pim-task-estimate> \
+                <pim-startstop :task="task" /> \
+                <pim-duration :duration="task.estimateString()" /> \
                 <pim-task-settoday :task="task" v-if="this.week"></pim-task-settoday> \
                 <pim-task-resettoday :task="task" v-if="this.day && this.task.isThisWeek()"></pim-task-resettoday> \
               </div> \
@@ -89,7 +103,7 @@ Vue.component('pim-clear', {
 // clicked.
 
 Vue.component('pim-task-list', {
-  props: ['taskList', 'title', 'add', 'clear', 'week', 'day'],
+  props: ['taskList', 'title', 'add', 'clear', 'week', 'day', 'hidewhenempty'],
   data: function () {
     return {
       numTasks: this.taskList.tasks.length,
@@ -107,12 +121,14 @@ Vue.component('pim-task-list', {
       alert(event.target.tagName)
     },
   },
-  template: '<div class="panel panel-primary"> \
+  template: '<div v-if="this.taskList.numTasks() || !hidewhenempty" class="panel panel-primary"> \
                <div class="panel-heading"> \
                  <h4 class="panel-title">{{title}} \
                  <pim-add v-if="this.add" :id="id" /> \
-                 <span v-if="this.taskList.duration()" class="badge pull-right" >{{this.taskList.durationFormatted()}}</span> \
-                 <pim-clear v-if="this.clear" :taskList="taskList" /> \
+                 <div class="pull-right"> \
+                   <pim-duration :duration="this.taskList.durationFormatted()" /> \
+                   <pim-clear v-if="this.clear" :taskList="taskList" /> \
+                 </div> \
                  </h4> \
                </div> \
                <div class="list-group container-fluid"> \

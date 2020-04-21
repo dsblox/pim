@@ -87,7 +87,12 @@
 
 
   <div class="col-sm-4">
-    <pim-task-list :task-list="done" title="Done" clear="true" v-on:toggle="adjustTask" />
+    <div class="row">
+      <pim-task-list :task-list="inprogress" title="In Progress" v-on:toggle="adjustTask" hidewhenempty="true"/>
+    </div>
+    <div class="row">
+      <pim-task-list :task-list="done" title="Done" clear="true" v-on:toggle="adjustTask" />
+    </div>
   </div>
 
 </div>
@@ -204,6 +209,7 @@ new Vue({
     scheduled: scheduled,
     stuff: stuff,
     done: done,
+    inprogress: inprogress,
     states: TaskState
   },
   methods: {

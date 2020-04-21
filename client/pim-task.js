@@ -44,6 +44,14 @@ class Task {
     return (this.state == TaskState.COMPLETE);
   }
 
+  isNotStarted() {
+    return (this.state == TaskState.NOT_STARTED); 
+  }  
+
+  isInProgress() {
+    return (this.state == TaskState.IN_PROGRESS); 
+  }
+
   markComplete() {
     this.state = TaskState.COMPLETE;
   }

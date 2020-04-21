@@ -132,7 +132,7 @@ func initMasterTask(dbName string) *Task {
     // and should not be printed out or saved.
     var masterTask *Task = NewTaskMemoryOnly("Your Task List")
 
-    if dbName == "YAML" {
+    if dbName == "YAML" || dbName == "yaml" {
 
     	tdmyaml := NewTaskDataMapperYAML("yaml/tasks.yaml")
     	if tdmyaml == nil {
@@ -326,7 +326,7 @@ func main() {
 	flag.StringVar(&static_files_location, "html", "./client", "specify path to static web files on this server")
 	flag.StringVar(&certs_location, "certs", ".", "specify path to TLS certificates on this server")
 	flag.StringVar(&listenport, "port", "4000", "specify port on which the server will take requests")
-	flag.StringVar(&dbName, "db", DB_NAME, "specify the database to use on the server")
+	flag.StringVar(&dbName, "db", DB_NAME, "specify the database to use on the server or YAML")
 	flag.Parse()
 
 	// if we're starting as a server
