@@ -21,6 +21,10 @@
 <!-- script src="https://unpkg.com/lodash@4.13.1/lodash.min.js"></script -->
 <!-- script src="https://cdnjs.cloudflare.com/ajax/libs/vue-strap/1.1.29/vue-strap.min.js"></script -->
 
+<!-- my CSS overrides -->
+<link rel="stylesheet" href="pim.css">
+<script src="pim-bootstrap.js"></script>
+
 <!-- The following must be in order - look for a new tool to improve this -->
 <script src="pim-ajax.js"></script>
 <script src="pim-task.js"></script>
@@ -60,7 +64,7 @@
 <div class="row">
 
   <div class="col-sm-6">
-    <pim-task-list :task-list="planWeek" title="Weekly Goals" add="true" week="true" v-on:toggle="adjustTask" />
+    <pim-task-list :task-list="planWeek" title="Weekly Goals" add="true" week="true" clear="thisweek" v-on:toggle="adjustTask" />
   </div>
 
 
@@ -98,8 +102,12 @@
             <input type="time" class="form-control" id="starttime">
           </div>
           <div class="form-group">
-            <label for="durartion">Estimate (minutes):</label>
+            <label for="duration">Estimate (minutes):</label>
             <input type="number" class="form-control" id="duration">
+          </div>
+          <div class="form-group">
+            <label for="tags">Tags:</label>
+            <input type="text" class="form-control" id="tags">
           </div>
           <input type="hidden" id="today" value="false">
           <input type="hidden" id="thisweek" value="true">
@@ -130,10 +138,6 @@ $('#myModal').on('show.bs.modal', function (event) {
   	var button = $(event.relatedTarget); // Button that triggered the modal
   	currList = taskListFromID(button.data('list')) // Extract info from data-* attributes
   	currTask = findTask(button.data('taskid'));
-    console.log("button.text = " + button.text);
-    console.log("button" , button);    
-    console.log("taskid = " + button.data('taskid'));
-    // console.log(currList.numTasks());
 
   	// initialize or clear the modal's form fields
   	var title = null;
@@ -144,6 +148,7 @@ $('#myModal').on('show.bs.modal', function (event) {
       f.elements["startdate"].value = extractDateString(currTask.getTargetStartTime());
   		f.elements["starttime"].value = extractTimeString(currTask.getTargetStartTime());
   		f.elements["duration"].value = currTask.estimate;  	
+      f.elements["tags"].value = currTask.getTags();
   		f.elements["delete"].style.visibility = 'visible';
 
   	} 
@@ -165,6 +170,7 @@ $('#myModal').on('show.bs.modal', function (event) {
   		f.elements["startdate"].value = new Date().toISOString().split('T')[0];
       f.elements["starttime"].value = null;
   		f.elements["duration"].value = null;
+      f.elements["tags"].value = null;
   		f.elements["delete"].style.visibility = 'hidden';  	
   	}
   	
@@ -174,6 +180,7 @@ $('#myModal').on('show.bs.modal', function (event) {
 })
 
 // call the server to get tasks and put into the lists
+currentPage = "planning"
 loadTasksThisWeek();
 loadTasksThisDay();
 

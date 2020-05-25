@@ -4,6 +4,7 @@
 <meta charset="utf-8"> 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+
 <!-- LOCAL VERSIONS -->
 <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap.min.css">
 <script src="jquery/3.2.1/jquery.min.js"></script>
@@ -67,11 +68,20 @@
 
 <div id="pim-root" class="container-fluid">
 
-<h1 class="text-center bg-primary lead">
-	TODAY
-	<button type="button" class="btn btn-xs btn-primary" data-toggle="modal" data-target="#myModal">
-  		<span class="glyphicon glyphicon-plus"></span>&nbsp;
-	</button>
+<h1 class="bg-primary lead">
+<div class="row">
+  <div class="col-sm-2">
+  </div>
+  <div class="col-sm-8 text-center">
+    <span class="bg-primary lead">TODAY</span>
+    <button type="button" class="btn btn-xs btn-primary" data-toggle="modal" data-target="#myModal">
+        <span class="glyphicon glyphicon-plus"></span>&nbsp;
+    </button>    
+  </div>
+  <div class="col-sm-2">
+    <pim-tagpicker :tags="allTags" />
+  </div>
+</div>
 </h1>
 
 <div class="row">
@@ -85,13 +95,16 @@
     <pim-task-list :task-list="stuff" title="Stuff To Do" v-on:toggle="adjustTask" />
   </div>
 
-
   <div class="col-sm-4">
     <div class="row">
-      <pim-task-list :task-list="inprogress" title="In Progress" v-on:toggle="adjustTask" hidewhenempty="true"/>
+        <div class="col-sm-12">
+          <pim-task-list :task-list="inprogress" title="In Progress" v-on:toggle="adjustTask" hidewhenempty="true"/>
+        </div>
     </div>
     <div class="row">
-      <pim-task-list :task-list="done" title="Done" clear="true" v-on:toggle="adjustTask" />
+      <div class="col-sm-12">
+        <pim-task-list :task-list="done" title="Done" clear="today" v-on:toggle="adjustTask" />
+      </div>
     </div>
   </div>
 
@@ -125,8 +138,12 @@
             <input type="time" class="form-control" id="starttime">
           </div>
           <div class="form-group">
-            <label for="durartion">Estimate (minutes):</label>
+            <label for="duration">Estimate (minutes):</label>
             <input type="number" class="form-control" id="duration">
+          </div>
+          <div class="form-group">
+            <label for="tags">Tags:</label>
+            <input type="text" class="form-control" id="tags">
           </div>
           <input type="hidden" id="today" value="true">
           <input type="hidden" id="thisweek" value="false">
@@ -164,14 +181,10 @@ var currList = null;
 var currTask = null; // remember it so we don't have to look it up again on submit
 $('#myModal').on('show.bs.modal', function (event) {
 
-	// find any data the invocation is trying to send us
+    // find any data the invocation is trying to send us
   	var button = $(event.relatedTarget) // Button that triggered the modal
   	currList = taskListFromID(button.data('list')) // Extract info from data-* attributes
   	currTask = findTask(button.data('taskid'))
-    console.log("taskid = " + button.data('taskid'));
-    console.log("button" , button);  
-
-
 
   	// initialize or clear the modal's form fields
   	var title = null;
@@ -181,7 +194,8 @@ $('#myModal').on('show.bs.modal', function (event) {
   		f.elements["task"].value = currTask.name;
       f.elements["startdate"].value = extractDateString(currTask.getTargetStartTime());
   		f.elements["starttime"].value = extractTimeString(currTask.getTargetStartTime());
-  		f.elements["duration"].value = currTask.estimate;  	
+  		f.elements["duration"].value = currTask.estimate;
+      f.elements["tags"].value = currTask.getTags();
   		f.elements["delete"].style.visibility = 'visible';
 
   	} else {
@@ -190,6 +204,7 @@ $('#myModal').on('show.bs.modal', function (event) {
   		f.elements["startdate"].value = new Date().toISOString().split('T')[0];
       f.elements["starttime"].value = null;
   		f.elements["duration"].value = null;
+      f.elements["tags"].value = null;
   		f.elements["delete"].style.visibility = 'hidden';  	
   	}
   	
@@ -199,7 +214,11 @@ $('#myModal').on('show.bs.modal', function (event) {
 })
 
 // call the server to get tasks and put into the lists
+currentPage = "today"
 loadTasksToday();
+
+// all the tags are loaded into global allTags
+tagsFindAll();
 
 // here is a root Vue to hold references to my models
 // the data references can be linked to components
@@ -210,7 +229,9 @@ new Vue({
     stuff: stuff,
     done: done,
     inprogress: inprogress,
-    states: TaskState
+    states: TaskState,
+    selectedTag: selectedTag,
+    allTags: allTags,
   },
   methods: {
     adjustTask: function(task) { 

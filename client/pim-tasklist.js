@@ -23,6 +23,10 @@ class TaskList {
   	this.id = newId;
   }
 
+  filterToTag(tag) {
+    this.tasks.map(function(t){if(t.isTaskSet(tag)) { this.removeTask(t);} });
+  }
+
   // add a task and keep in time order unless requested not to
   insertTask(task, placement = 'end') {
 
@@ -32,7 +36,8 @@ class TaskList {
     //   - insutrction to place after task with that 'id'
     var bStartTimeSort = (placement == 'targetstarttime')
     var bDoneTimeSort = (placement == 'actualendtime')
-    var bInsertAfter = (!bStartTimeSort && !bDoneTimeSort && placement != 'end')
+    var bStart = (placement == 'start')
+    var bInsertAfter = (!bStartTimeSort && !bDoneTimeSort && placement != 'end' && placement != 'start')
 
 	  // don't allow the same task 2x in this list
   	if (this.findTask(task.id) != null) {
@@ -87,6 +92,10 @@ class TaskList {
       }    
     }
 
+    else if (bStart) {
+      this.tasks.splice(0, 0, task);
+    }
+
     // otherwise just add to the end
     else {
       this.tasks.push(task);      
@@ -100,6 +109,11 @@ class TaskList {
     if (i >= 0) {
       this.tasks.splice(i,1);
     }
+  }
+
+  // see if a task is in the list
+  isHere(task) {
+    return (this.findTask(task.id) != null);
   }
 
   // find a task by id
@@ -148,6 +162,15 @@ class TaskList {
       target.insertTask(this.tasks[i]);
     }
     return target;
+  }
+
+  getTaskByIndex(i) {
+    if (i >=0 && i < this.numTasks()) { 
+      return this.tasks[i];
+    }
+    else {
+      return null;
+    }
   }
 
 }

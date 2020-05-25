@@ -1,6 +1,15 @@
-// create a component with the property "task" which is expected to be an object with
-// attributes for whether it is "complete", some "text" and an "id".  The task is
-// displayed as a checkbox bound to the "state" field of the task object provided
+/*
+==============================================================================
+ PIM Vue Components
+------------------------------------------------------------------------------
+ This is our component library for the application.  It is built 
+ hierarchically with the main components being:
+  pim-task-list - binds to a TaskList
+  pim-task      - beings to a Task
+
+ Lots of other sub-components represent user controls displaying attributes
+ and state of the tasks, and are grouped into the previous two for display.
+============================================================================*/
 
 Vue.component('pim-start-time', {
   props: ['task'],
@@ -44,7 +53,6 @@ Vue.component('pim-startstop', {
   props: ['task'],
   methods: {
     startstop: function() {
-      console.log("startstop");      
       startStop(this.task);
     }
   },
@@ -87,13 +95,23 @@ Vue.component('pim-add', {
 })
 
 Vue.component('pim-clear', {
-  props: ['taskList'],
-  template: '<a href="#" v-on:click="clear"> \
-                <span class="glyphicon glyphicon-transfer"></span> \
-             </a>',
+  props: ['taskList', 'tagtoclear'],
+  template: '<span class="glyphicon glyphicon-transfer" v-on:click="clear"></span>',
   methods: {
     clear: function(event) {
-      clearTodayAndList(this._props.taskList);
+      clearTagAndList(this._props.taskList, this._props.tagtoclear);
+    }
+  }
+})
+
+Vue.component('pim-tagpicker', {
+  props: ['tags', 'selected'],
+  template: '<select class="form-control" v-on:change="filter"> \
+               <option v-for="tag in tags">{{ tag }}</option> \
+             </select>',
+  methods: {
+    filter: function(event) {
+      selectTag(event.target.value);
     }
   }
 })
@@ -127,7 +145,7 @@ Vue.component('pim-task-list', {
                  <pim-add v-if="this.add" :id="id" /> \
                  <div class="pull-right"> \
                    <pim-duration :duration="this.taskList.durationFormatted()" /> \
-                   <pim-clear v-if="this.clear" :taskList="taskList" /> \
+                   <pim-clear v-if="this.clear" :tagtoclear="this.clear" :taskList="taskList" /> \
                  </div> \
                  </h4> \
                </div> \

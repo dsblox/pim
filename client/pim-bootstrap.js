@@ -9,6 +9,11 @@ function pimShowError(message) {
  }
 
  function pimAjaxError(response) {
- 	r = JSON.parse(response);
- 	pimShowError(r.msg)
+    try {
+ 	  r = JSON.parse(response);
+      pimShowError(r.msg)
+    }
+    catch {
+      pimShowError("Invalid JSON returned from server: " + response);
+    }
  }

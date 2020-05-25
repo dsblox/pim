@@ -1,28 +1,135 @@
-// the ajax calls will initially load tasks into these lists
-// depending on the attributes on the tasks
+/*
+=========================================================================
+ Task Changes
+-------------------------------------------------------------------------
+ The meat of our UI sits here, holding the UI-bound JavaSceript objects
+ that populate all the tasks in our UI.  Right now, we have one file
+ for all the objects that live in the UI, in anticipation of a true
+ SPA architecture (right now, there are separate pages for the larger
+ functions).
+
+ Each UI object tends to be a list of tasks, and its bound models live
+ here.  When the user does something to change a task's state, functions
+ here are called to make sure:
+   * the state change is reflected in the UI, and
+   * the state change is reflected on the server.
+========================================================================*/
+
+/*
+--------------------------------------------------------------------------
+ TODAY page
+------------------------------------------------------------------------*/
 var scheduled = new TaskList();
 var stuff = new TaskList();
 var done = new TaskList();
 var inprogress = new TaskList();
 
+/*
+--------------------------------------------------------------------------
+ PLANNING page
+------------------------------------------------------------------------*/
 var planWeek = new TaskList();
 planWeek.setId("PW");
 var planDay = new TaskList();
 planDay.setId("PD");
 
+/*
+--------------------------------------------------------------------------
+ HISTORY page
+------------------------------------------------------------------------*/
 var days = {};
 var selectedDate = null;
 var currday = new TaskList();
 var completedTaskDates = [];
 
+/*
+--------------------------------------------------------------------------
+ GLOBALS - that tend to span pages
+------------------------------------------------------------------------*/
+var currentPage = null; // recently added - not sure it is dependable
+var selectedTag = null; // only currently implemented on TODAY page
+var allTags     = [];   // list of all tags in popularity order
+
+
+/*
+=========================================================================
+ selectTag(tag)
+-------------------------------------------------------------------------
+ For now you can filter to one non-system tag at a time by chooseing
+ the tag picker, which calls this function each time a new tag is
+ chosen.  We basically clear and reload the screen from the server
+ when you choose a tag. 
+
+ Inputs: tag - user-defined tag to filter to
+
+ TBD: Consider the move from ALL tags to just one.  That should not
+      require a server call - just remove the non-selected tags from
+      each view.
+
+ TBD: Data-bind the selectedTag somehow so things happen more auto-vue-
+      magically? We've set it up to bind to the selector control, but
+      not the lists.
+========================================================================*/
+function selectTag(tag) {
+  console.log("selectTag(): tag = " + tag)
+  if (tag == 'All') {
+    selectedTag = null;
+  }
+  else {
+    selectedTag = tag;
+  }
+  // console.log(currentPage)
+  if (currentPage == 'today') {
+    scheduled.clean();
+    done.clean();
+    stuff.clean();
+    inprogress.clean();
+    loadTasksToday(selectedTag);
+  }
+  if (currentPage == "planning") {
+    planWeek.clean()
+    planDay.clean()
+    loadTasksThisWeek(selectedTag);
+    loadTasksThisDay(selectedTag);
+  }
+}
+
+/*
+=========================================================================
+ upsertTask()
+-------------------------------------------------------------------------
+ This is called from the modal when the Save button is clicked to 
+ manually collect the form elements, create a Task object, and call
+ the server to save / create it as specified by the state of the
+ modal.  If that wasn't enough, it manually puts the modified task into
+ all the right lists depending on which view was passed in.
+
+ Inputs: view - the current page so it knows which lists to change
+                TBD: just change all the lists and let the UI take
+                     care of itself?
+
+ TBD: do the modal in vue at some point so this doesn't feel like such
+      a hack.
+========================================================================*/
+// note this only adds new tags - it doesn't make
+// the tags set on the task "match" the string
+// (for example, by removing tags not in the string)
+function setTagsFromString(task, strTags) {
+  if (strTags.length > 0) {
+    var tags = strTags.split("/").map(function(e){return e.trim();});
+    tags.map(function(e){return task.addTag(e);});
+  }
+}
+
 function upsertTask(view) {
 	var t = null;
 	var f = document.getElementById("newTask");
 	var name    = f.elements["task"].value;
-    var strdate = f.elements["startdate"].value;
+  var strdate = f.elements["startdate"].value;
 	var strtime = f.elements["starttime"].value;
 	var today   = (f.elements["today"].value == "true"); // hidden field useable by every UI
 	var time = null;
+  var strtags = f.elements["tags"].value;
 
 	if (strtime.length > 0) {
 		// if date not specified, assume today		
@@ -40,7 +147,7 @@ function upsertTask(view) {
 		// with TZ info and will be stored in GMT
 	  	time = new Date(strdate + " " + strtime);
 	}
-	console.log("upsertTask: time=" + time);
+	// console.log("upsertTask: time=" + time);
 
 
 	// we decide whether or not to set the thisweek flag based on the hidden field
@@ -51,16 +158,20 @@ function upsertTask(view) {
 		duration = null;
 	}
 	if (currTask == null) {
-		t = new Task(null, name, time, null, duration, false, today, thisWeek);
-    	createTask(t); // create a new task on the server
+		t = new Task(null, name, time, null, duration, false);
+    t.setToday(today);
+    t.setThisWeek(thisWeek);
+    setTagsFromString(t, strtags);
+    createTask(t); // create a new task on the server
 
-    	if (view == 'planning') {
-    		if (thisWeek) {
-    			planWeek.insertTask(t);
-    		}
-    		else if (today) {
-    			planDay.insertTask(t);
-    		}
+
+    if (view == 'planning') {
+    	if (thisWeek) {
+    		planWeek.insertTask(t);
+  		}
+  		else if (today) {
+        planDay.insertTask(t);
+    	}
  		}
  		else {
 			var list = stuff;
@@ -71,21 +182,34 @@ function upsertTask(view) {
 			}
  			list.insertTask(t, sort?'targetstarttime':'end');
  		}
- 		console.log("upsertTask: new task id=" + t.id);
+ 		// console.log("upsertTask: new task id=" + t.id);
  		// tbd: put the id into the local version of the task
 	} else {
 		t = currTask;
 		t.setName(name);
 		t.setTargetStartTime(time);
 		t.setEstimate(duration);
-		t.setToday(today);
-		t.setThisWeek(thisWeek);
+    // these may be redundant - we should clean up or separate the
+    // system tags like today/thisweek from user-defined tags
+    t.setToday(today);
+    t.setThisWeek(thisWeek);
+    setTagsFromString(t, strtags);
+
 		moveTask(t); // adjust the task to show in all the right lists
 		currTask = null;
-    	replaceTask(t); // set all the fields on this task
+    replaceTask(t); // set all the fields on this task
 	}
 }
 
+/*
+=========================================================================
+ deleteTask()
+-------------------------------------------------------------------------
+ This always deletes the current task, which is always the one in the
+ modal in the UI.  It decides not to care about the view, just removing
+ the task from all of them (except history where the modal doesn't
+ currently display - but probably should and will soon).
+========================================================================*/
 function deleteTask() {
 	if (currTask == null) {
 		return;
@@ -95,11 +219,11 @@ function deleteTask() {
 	done.removeTask(currTask);
 	stuff.removeTask(currTask);
 	scheduled.removeTask(currTask);
-    planWeek.removeTask(currTask);
-    planDay.removeTask(currTask);
+  planWeek.removeTask(currTask);
+  planDay.removeTask(currTask);
 
-    // delete the task from the server (when we write it)
-    killTask(currTask);
+  // delete the task from the server (when we write it)
+  killTask(currTask);
 
 	// remove what we hope is the last reference to the task
 	currTask = null;
@@ -111,7 +235,20 @@ function cancelModal() {
 }
 
 
+/*
+=========================================================================
+ findTaskInList()
+-------------------------------------------------------------------------
+ This heavily used funciton searches the specified list for an id and
+ returns either:
+   * the task - if it was found and the "task" return type was requested
+   * the list - if it was found and the "list" return type was requested
+   * null - if it was not nfound
 
+ Inputs: TaskList list       - the TaskList to search
+         string   id         - the id of the task being sought
+         string   returnType - 'task' or 'list'
+========================================================================*/
 function findTaskInList(list, id, returnType) {
 	found = null;
 	found = list.findTask(id);
@@ -142,6 +279,9 @@ function findTaskInPIMList(id, returnType) {
 	if (!found) {
 		found = findTaskInList(done, id, returnType);
 	}
+  if (!found) {
+    found = findTaskInList(inprogress, id, returnType);
+  }
 	if (!found) {
 		findTaskInList(planWeek, id, returnType);
 	}
@@ -186,23 +326,6 @@ function extractDateString(timestamp) {
   return strDate;  
 }
 
-// set local to true to convert date to local timezone
-// typically we want them in the local time zone when we are in weekly / daily views
-// and we want them in UTC in historical views - though perhaps we should change that?
-function stringToDate(strDate, local) {
-  if (strDate == null) {
-    return null;
-  }
-  date = new Date(strDate.substring(0,strDate.length-1));
-  if ((strDate.slice(-1) == "Z") && (local)) { // Z as last char means UTC
-	var offset = new Date().getTimezoneOffset();
-  	date.setMinutes(date.getMinutes() - offset);
-  }	
-
-  return date;
-}
-
-
 function taskListFromID(id) {
 	var result = null;
 	switch (id) {
@@ -215,20 +338,28 @@ function taskListFromID(id) {
 	return result;
 }
 
-// this function is called when a task is marked completed
-// or "unmarked" completed - it moves the task from list
-// to list
-// right now it will also make an ajax call to update the task
-// TBD: in today view, when the date of a task changes to another
-//   date then we should remove it from this view entirely.  Not
-//   being done right now.  Once we have a planning view where
-//.  we can see all our tasks across days we can implement that.
+/*
+=========================================================================
+ moveTask()
+-------------------------------------------------------------------------
+ This heavily used function is called when a task is marked completed
+ or "unmarked" completed - it moves the task from list to list in the UI
+ based on it's previous and new state, and updates the task on the
+ server to reflect its new state.
+========================================================================*/
 function moveTask(task) {
   if (task == null) { return; }
 
-  console.log("in moveTask(): complete="+task.isComplete());
+  // console.log("in moveTask(): complete="+task.isComplete());
 
   if (task.isComplete()) {
+
+
+    // if it is in the weekly list then move it to the bottom
+    if (planWeek.isHere(task)) {
+        planWeek.removeTask(task);
+        planWeek.insertTask(task);
+    }
 
     // make sure it is in the done list
     done.insertTask(task, false);
@@ -300,15 +431,29 @@ function toggleTask(task) {
     moveTask(task);
 }
 
-function clearTodayAndList(list) {
+// badly named function because we only clear tasks that
+// are in the list, marked done, and clear them of the specified tag
+function clearTagAndList(list, tagToClear) {
+  // only today and thisweek are currently supported
+  // once we properly implement tags in the JS Task
+  // object we can generalize this better
+  if (!(tagToClear == 'today' || tagToClear == 'thisweek')) {
+    return;
+  }
+
   var lenClear = list.tasks.length;
   // go backwards so we can remove items from the end
   // and do the loop for both server and UI
   for (var idxClear = lenClear - 1; idxClear >= 0; idxClear--) {
-    console.log(list.tasks[idxClear].name);
     task = list.tasks[idxClear];
-    clearToday(task);
-    list.removeTask(task);
+    if (task.isComplete()) {
+        console.log(task.name);
+        switch (tagToClear) {
+            case 'today': clearToday(task);
+            case 'thisweek': clearThisWeek(task);
+        }
+        list.removeTask(task);
+    } // only clear the completed tasks
   }  
 }
 
@@ -344,4 +489,203 @@ function startStop(task) {
     moveTask(task);
 }
 
+
+/*
+=========================================================================
+ Today View - Loading into Various Lists
+-------------------------------------------------------------------------
+ These two functions make sure various lists that make up the today
+ view are populated properly from the server, with each list presumably
+ bound to the UI.  It distributes the items into lists based on their
+ status and existence of a time (it puts timed items into a calendar).
+ One function kicks off the server call and the other is called back
+ for each task returned by the server.
+
+ Structure:
+  * loadTasksToday() - kicks off ajax call for all 'today' tasks
+  * todayTaskIntoLists() - figures where to put each task
+========================================================================*/
+function todayTaskIntoLists(task) {
+  if (task.isComplete()) {
+    done.insertTask(task, 'actualendtime');
+  }
+  else if (task.isInProgress()) {
+    inprogress.insertTask(task);
+  }
+  else {
+    if (task.getTargetStartTime() == null) {
+      stuff.insertTask(task);
+    }
+    else {
+      scheduled.insertTask(task, 'targetstarttime');
+    }
+  }
+}
+function loadTasksToday(tags = null) {
+  collectTasks(tasksTodayURL(tags), todayTaskIntoLists)
+}
+
+
+/*
+=========================================================================
+ Planning View - Loading the Week and Day Lists
+-------------------------------------------------------------------------
+ These two sets of functions load the "thisweek" and "today" lists
+ so they can be displayed side-by-side (will later be augmented with
+ thismonth and thisyear and foreever lists???).  They mostly rely on
+ the server supporting their system tags of "thisweek" and "today" which
+ magically also check their dates and auto-include them even if the tag
+ is not set explicitly on them.
+
+ Structure:
+  * loadTasksThisDay() - kicks off ajax call for all 'today' tasks
+  * loadTasksThisWeek() - kicks off ajax call for all 'thisweek' tasks
+  * planTaskIntoWeek() - adds task to proper place in week list
+  * planTaskIntoDay() - added task to day list
+
+ TBD - Funny use of a global to track where to put things in the week
+       view so completed weekly items auto-populate ar the bottom of the
+       list.
+========================================================================*/
+var planningIdLastIncomplete = null;
+function planTaskIntoWeek(task) {
+  if (task.isComplete()) {
+    planWeek.insertTask(task, 'end');
+  }
+  else {
+    planWeek.insertTask(task, planningIdLastIncomplete!=null?planningIdLastIncomplete:'start');
+    planningIdLastIncomplete = task.id;
+  } 
+}
+function loadTasksThisWeek(tags = null) {
+  planningIdLastIncomplete = null;
+  collectTasks(tasksThisWeekURL(), planTaskIntoWeek)
+}
+
+function planTaskIntoDay(task) {
+  planDay.insertTask(task)
+}
+function loadTasksThisDay(tags = null) {
+  collectTasks(tasksTodayURL(), planTaskIntoDay)
+}
+
+
+/*
+=========================================================================
+ History View - Loading the Currently Selected Day
+-------------------------------------------------------------------------
+ Given a date, these functions load the history currDay task list global
+ with the tasks completed on that day.  The global is typically bound
+ to a UI control to show the tasks.  The list is cleared on each run
+ so it starts fresh.
+
+ Structure:
+  * loadTasksByDay() - kicks off ajax call for all done on that day
+  * historyTaskIntoDay() - just adds each found task to the list
+
+ TBD - It seems weird that we're calling tasksFindURL with the date but
+       we don't specify here that we only want completed tasks.  Is
+       the "find" function currently hard-coded to just completed tasks?
+========================================================================*/
+function dateToString(date) {
+  var result = "";
+  if (date != null) {
+    result += date.getFullYear();
+    result += "-";
+    result += (date.getMonth() < 9 ? "0" : "") + (date.getMonth() + 1);
+    result += "-";
+    result += (date.getDate() < 10 ? "0" : "") + date.getDate();
+  }
+  return result;
+}
+function historyTaskIntoDay(task) {
+  currday.insertTask(task)
+}
+function loadTasksByDay(date) {
+  currday.clean();
+  if (date == null) {
+    return;
+  }
+  collectTasks(tasksFindURL(dateToString(date)), historyTaskIntoDay)
+
+  // selectedDate is bound to vue calendar control so will select the date
+  // this is bullshit - not sure why I have to reach into the view model
+  // and can't just change my JS Date - but I can't.
+  v["selectedDate"] = date;
+}
+
+
+/*
+=========================================================================
+ History View - Loading the Calendar Control
+-------------------------------------------------------------------------
+ These functions are useful only to populate the calendar control so th
+ user knows which days have completed tasks on them, and which do not so
+ she know which to click to find things.  Each task is added to the
+ completedTaskDates global which gets bound to the calendar control.
+ When all are done we invoke loadTasksByDay() to load the most recent
+ day with the actual task display.
+
+ Structure:
+  * findAllCompletedTaskDates() - kicks it all off with 2 callbacks
+  * historyTaskIntoCalendar() - is called for each collected task
+  * historyDoneLoadingTasks() - is called when all tasks are processed
+
+ TBD - These dates are off because of timezones!!!  They used to be
+       closer (but still off a little) when I used the raw completion
+       time from the server JSON, but when I converted it here I lost
+       something.
+
+ TBD - ugly use of global variables for availability across callbacks.
+========================================================================*/
+var historyUniqueDates = {};
+var historyMaxDate = null;
+function historyTaskIntoCalendar(task) {
+  var timestamp = task.getActualCompletionTime();
+  if (timestamp != null) {
+    // chopping off time is ignoring timezone and resulting in
+    // the wrong date?  Or is it working and "FindByCompletionDate()"
+    // is ignoring the TZ?
+    var completionDate = new Date(timestamp.toDateString()); 
+    if (completionDate != null) {
+      if (!historyUniqueDates[completionDate]) {
+        historyUniqueDates[completionDate] = true;
+        completedTaskDates.push(completionDate);
+        if (historyMaxDate == null || completionDate > historyMaxDate) {
+          historyMaxDate = completionDate;
+        } // if the high water mark wasn't already set
+      } // if it isn't already in the list of unique dates
+    } // if the date call didn't fail
+  } // if we have a completio time
+}
+function historyDoneLoadingTasks(status) {
+  loadTasksByDay(historyMaxDate)
+}
+function findAllCompletedTaskDates() {
+  historyUniqueDates = {}
+  historyMaxDate = null
+  collectTasks(tasksCompleteURL(), historyTaskIntoCalendar, historyDoneLoadingTasks)
+}
+
+/*
+=========================================================================
+ Tags
+-------------------------------------------------------------------------
+ Functions to collect all the tags in all the tasks on the server so
+ we can present them as choices for the user to filter on.  They are
+ stored on a global sorted by most-used (but we drop the counts since
+ the UI doesn't actually need them).
+========================================================================*/
+function tagsDoneFinding(mapTags) {
+  while (allTags.length) {
+    allTags.pop()
+  }
+  allTags.push("All")
+  aTags = Object.entries(mapTags)
+  aTags.sort(function(a,b){b[1]-a[1]})
+  aTags.map(function(e){allTags.push(e[0])})
+}
+function tagsFindAll() {
+  collectTags(tagsDoneFinding)
+}
 

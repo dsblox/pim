@@ -8,11 +8,13 @@
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="pim-ajax.js"></script>
+<script src="pim-taskajax.js"></script>
+<script src="pim-task.js"></script>
+<script src="pim-tasklist.js"></script>
 </head>
 <body>
     <h1>PIM API Test Client</h1>
-
-
 
     <div class="container">
     <!--Row with two equal columns-->
@@ -24,7 +26,8 @@
             <input type="date" class="form-control" id="list.date">
           </div>
   
-        <button type="button" class="btn btn-primary" onclick="loadTasks()">List Tasks</button>
+        <button type="button" class="btn btn-primary" onclick="apiLoadTasks()">List Tasks</button>
+        <button type="button" class="btn btn-primary" onclick="apiLoadTags()">List Tags</button>
         <div id="list">
         </div>
         </div>
@@ -70,10 +73,10 @@
             <input type="time" class="form-control" id="detail.endtime">
           </div>
 
-          <button type="button" class="btn btn-primary" onclick="createTask()">Create</button>
-          <button type="button" class="btn btn-primary" onclick="replaceTask()">Replace</button>
-          <button type="button" class="btn btn-primary" onclick="updateTask()">Update</button>
-          <button type="button" class="btn btn-primary" onclick="deleteTask()">Delete</button>
+          <button type="button" class="btn btn-primary" onclick="apiCreateTask()">Create</button>
+          <button type="button" class="btn btn-primary" onclick="apiReplaceTask()">Replace</button>
+          <button type="button" class="btn btn-primary" onclick="apiUpdateTask()">Update</button>
+          <button type="button" class="btn btn-primary" onclick="apiDeleteTask()">Delete</button>
         </div>
       </div>
       <h4>Raw Request</h4>
@@ -95,60 +98,16 @@
 // default date to today
 document.getElementById('detail.startdate').value = new Date().toISOString().split('T')[0];
 
-var baseURL = "https://localhost:4000/";
-var nSecPerMinute = 60000000000;
-
-function makeURL(rest) {
-  return baseURL + rest;
-}
-
-function tasksURL(id = "") {
-  var rest = "tasks";
-  if (id) {
-    rest += "/";
-    rest += id;
-  }
-  return makeURL(rest)
-}
-
-function tasksFindURL(date) {
-  var rest = "tasks";
-  if (date) {
-    rest += "/date/";
-    rest += date;
-  }
-  return makeURL(rest)
-}
-
-
-function taskItemHTML(task) {
-  html = '<button class=\"btn btn-link\"';
-  html += ' onclick="loadTask(\'' + task.id + '\')">'
-  html += task.name;
-  html += '</button><br />';
-  return html;
-}
-
-function taskListHTML(tasks) {
-  html = "<ul>";
-  for (i = 0; i < tasks.length; i++) {
-        html += taskItemHTML(tasks[i]);
-  }
-  html += "</ul>";
-  return html;
-}
-
-function ajaxObj() {
- var xmlhttp;
-  if (window.XMLHttpRequest) {
-    xmlhttp = new XMLHttpRequest();
-  } else {
-    // code for older browsers
-    xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
-  }
-  return xmlhttp;  
-}
-
+/*
+==============================================================================
+ Override our own Ajax package
+------------------------------------------------------------------------------
+ We override a couple of low level Ajax functions from our pim-ajax file so
+ that we can easily see the underlying request / response structure here on
+ our debugging page.  Note that the lower level object creation, and the
+ higher-level "directive (PUT, POST, etc)" functions are not overridden so
+ we use those from the original, included pim-ajax.js file.
+=============================================================================*/
 function ajaxSimple(xmlhttp, url, directive) {
   document.getElementById("request_directive").innerHTML = directive;
   document.getElementById("request_url").innerHTML = url;
@@ -167,22 +126,10 @@ function ajaxPayload(xmlhttp, url, payload, directive) {
   xmlhttp.send(json);
 }
 
-function ajaxGet(xmlhttp, url) {
-  ajaxSimple(xmlhttp, url, "GET");
-}
-
-function ajaxDelete(xmlhttp, url) {
-  ajaxSimple(xmlhttp, url, "DELETE");
-}
-
-function ajaxPost(xmlhttp, url, payload) {
-  ajaxPayload(xmlhttp, url, payload, "POST");
-}
-
-function ajaxPut(xmlhttp, url, payload) {
-  ajaxPayload(xmlhttp, url, payload, "PUT");
-}
-
+/*
+------------------------------------------------------------------------------
+ displayRawResponse - drop the raw response onto the debugging display
+----------------------------------------------------------------------------*/
 function displayRawResponse(status, text) {
   document.getElementById("raw_response").innerHTML = text;
   document.getElementById("response_code").innerHTML = status;
@@ -216,18 +163,18 @@ function forceValidTime(time) {
     if (parts.length != 0) {
       fixed = (isInRange(parts[0],0,23)?parts[0]:"00");
       fixed += ":";
-      console.log(fixed);
+      // console.log(fixed);
       if (parts.length > 1) {
         fixed += (isInRange(parts[1],0,59)?parts[1]:"00");
         fixed += ":";
-        console.log(fixed);
+        // console.log(fixed);
         if (parts.length > 2) {
           fixed += (isInRange(parts[2],0,59)?parts[2]:"00");
         }
         else {
           fixed += "00";
         }
-        console.log(fixed);
+        // console.log(fixed);
       }
       else {
         fixed += "00:00";
@@ -246,123 +193,146 @@ function formatDateTime(date, time) {
   return date + "T" + forceValidTime(time) + "Z";
 }
 
-function loadTask(id) {
-  ajax = ajaxObj();
-  ajax.onreadystatechange = function() {
-    if (this.readyState == 4) {
-      displayRawResponse(this.status, this.responseText);
-      if (this.status == 200) {
-        task = JSON.parse(this.responseText);
-        document.getElementById("detail.id").value = task.id;
-        document.getElementById("detail.name").value = task.name;
-        document.getElementById("detail.state").value = task.state;
-        document.getElementById("detail.duration").value = task.estimate;
 
-        // for now ignore the date - extract just the time
-        document.getElementById("detail.starttime").value = extractTime(task.targetStartTime);
+/*
+==============================================================================
+ Test Tool Implementation Notes
+------------------------------------------------------------------------------
+ Our test tool leverages the same Ajax and basic JavaScript Task objects as 
+ the application to test the server.  We should probably break out what is
+ "pure server" testing and what we want to allow to use the front-end app.
+ I've drawn that line at the basic JavaScript Task and TaskList objects,
+ and SOME of the functions (the ones that don'e have knowledge of specific
+ UI lists) in pim-taskajax.
+=============================================================================*/
 
-        // try getting the date
-        document.getElementById("detail.startdate").value = extractDate(task.targetStartTime); 
-      }
-    }
-  };
-  ajaxGet(ajax, tasksURL(id));
+
+/*
+==============================================================================
+ Loading
+------------------------------------------------------------------------------
+ We load individual and lists of tasks leveraging the collectTaskX methods
+ which call the server and allow you to specify a callback to get either
+ individual tasks or task lists back.  We then convert the JavaScript tasks
+ onto our form in different ways.
+=============================================================================*/
+function apiTaskDone(task) {
+  if (task != null) {
+    document.getElementById("detail.id").value = task.getId();
+    document.getElementById("detail.name").value = task.getName();
+    document.getElementById("detail.state").value = task.getState();
+    document.getElementById("detail.duration").value = task.getEstimate();
+    document.getElementById("detail.starttime").value = timeToForm(task.getTargetStartTime());
+    document.getElementById("detail.startdate").value = dateToForm(task.getTargetStartTime());
+    document.getElementById("detail.endtime").value = timeToForm(task.getActualCompletionTime());
+    document.getElementById("detail.enddate").value = dateToForm(task.getActualCompletionTime());
+  } 
 }
 
-function loadTasks() {
+function apiLoadTask(id) {
+  collectTask(id, apiTaskDone)
+}
+
+function taskItemHTML(task) {
+  html = '<button class=\"btn btn-link\"';
+  html += ' onclick="apiLoadTask(\'' + task.id + '\')">'
+  html += task.name;
+  html += '</button><br />';
+  return html;
+}
+
+function taskListHTML(tasks) {
+  html = "<ul>";
+  for (i = 0; i < tasks.numTasks(); i++) {
+        html += taskItemHTML(tasks.getTaskByIndex(i));
+  }
+  html += "</ul>";
+  return html;
+}
+
+function apiListDone(tasks) {
+  document.getElementById("list").innerHTML = taskListHTML(tasks);
+}
+
+function apiLoadTasks() {
+  console.log("pim-api: apiLoadTasks()")
 
   // collect any filtering we want to do - for now just date
-  // task.targetStartTime = formatDateTime(document.getElementById("detail.startdate").value,
   var strdate = document.getElementById("list.date").value;
   if (strdate.length == 0) {
     strdate = null;
   }
-  
-  ajax = ajaxObj();
-  ajax.onreadystatechange = function() {
-    if (this.readyState == 4) {
-      displayRawResponse(this.status, this.responseText);
-      if (this.status == 200) {
-        tasks = JSON.parse(this.responseText);
-        document.getElementById("list").innerHTML = taskListHTML(tasks);
-      }
-    }
-  };
-  ajaxGet(ajax, tasksFindURL(strdate));
+
+  collectTasks(tasksFindURL(strdate), null, apiListDone)
 }
 
-// directives:
-// POST = Create
-// PATCH = Update
-// PUT = Replace
-function writeTask(directive) {
+function tagListHTML(mapTags) {
+  aTags = Object.entries(mapTags);
+  var html = "<ul>";
+  aTags.map(function(e){html += '<button class=\"btn-link\" onclick=\"\">' + e[0] + " (" + e[1] + ")</button><br />"})
+  html += "</ul>";
+  return html;
+}
 
-  // collect the task from the form elements
-  var task = {};
-  id = document.getElementById("detail.id").value;
-  task.name = document.getElementById("detail.name").value;
-  task.state = document.getElementById("detail.state").value * 1;
-  task.estimate = document.getElementById("detail.duration").value * 1;
-  task.targetStartTime = formatDateTime(document.getElementById("detail.startdate").value,
+function apiTagsDone(mapTags) {
+  document.getElementById("list").innerHTML = tagListHTML(mapTags);  
+}
+
+function apiLoadTags() {
+  console.log("pim-api: apiLoadTags()")
+  collectTags(apiTagsDone)
+}
+
+/*
+==============================================================================
+ Writing
+------------------------------------------------------------------------------
+ We load individual and lists of tasks leveraging the collectTaskX methods
+ which call the server and allow you to specify a callback to get either
+ individual tasks or task lists back.  We then convert the JavaScript tasks
+ onto our form in different ways.
+=============================================================================*/
+function apiPrepareTask(includeId = true) {
+  var id = document.getElementById("detail.id").value;
+  var name = document.getElementById("detail.name").value;
+  var state = document.getElementById("detail.state").value * 1;
+  var estimate = document.getElementById("detail.duration").value * 1;
+  var targetStartTime = formatDateTime(document.getElementById("detail.startdate").value,
                                   document.getElementById("detail.starttime").value);
-  if (directive != "POST") {
-    task.id = id;
-    if (directive == "PATCH") {
-      task.dirty = ["name", "state", "estimate", "targetstarttime", "actualcompletiontime"];
-    }
+  if (!includeId) {
+    id = null;
   }
-  else {
-    id = "";
-  }
-
-  ajax = ajaxObj();
-
-  ajax.onreadystatechange = function() {
-    if (this.readyState == 4) {
-      displayRawResponse(this.status, this.responseText);
-      if (this.status == 200) {
-        // successful - should we do something?
-      }
-    }
-  };
-
-  // a little confusing but it saves a lot of code
-  // wrapper task passes in the right directive and based
-  // on the directive (POST, PUT, PATCH) we've set up
-  // the id to be valid or not to bulid the right URL
-  ajaxPayload(ajax, tasksURL(id), task, directive);
+  var task = new Task(id, name, targetStartTime, null, estimate, false);
+  task.setState(state);
+  return task;
 }
 
-function createTask() {
-  writeTask("POST"); // POST means create
+function apiCreateTask() {
+  console.log("pim-api: apiCreateTask()")
+  createTask(apiPrepareTask(false))
+  // writeTask("POST"); // POST means create
 }
-function replaceTask() {
-  writeTask("PUT"); // PUT means replace
+function apiReplaceTask() {
+  console.log("pim-api: apiReplaceTask()")
+  replaceTask(apiPrepareTask());
 }
-function updateTask() {
+function apiUpdateTask() {
+  console.log("pim-api: apiUpdateTask()")
   // this isn't working yet - if a field has not been changed it should
   // not even be included in the JSON that gets sent to the server.  We
   // need to add "dirty flags" to our form fields and only send the dirty
-  // info if we want to properly test this.
-  writeTask("PATCH"); // PATCH means update
+  // info if we want to properly test this.  For now this invokes a PATCH
+  // but with some hard-coded dirty flags we can play with.
+  var task = apiPrepareTask();
+  // task.dirty = ["name", "state", "estimate", "targetstarttime", "actualcompletiontime"];
+  task.dirty = ["estimate"];
+  updateTask(task);
 }
 
-function deleteTask() {
-  id = document.getElementById("detail.id").value;
-  ajax = ajaxObj();
-
-  ajax.onreadystatechange = function() {
-    if (this.readyState == 4) {
-      displayRawResponse(this.status, this.responseText);
-      if (this.status == 200) {
-        // successful - should we do something?
-      }
-    }
-  };
-
-  ajaxDelete(ajax, tasksURL(id));
+function apiDeleteTask() {
+  console.log("pim-api: apiDeleteTask()")
+  killTask(apiPrepareTask());
 }
-
 
 </script>
 

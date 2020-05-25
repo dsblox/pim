@@ -8,6 +8,7 @@ import (
     "fmt"
     "time"
     "log"
+    "strings"
     // "errors"
 
     "github.com/gorilla/mux"
@@ -127,16 +128,72 @@ func Index(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintln(w, "PIM Task Manager Server")
 }
 
+/*
+==============================================================================
+ TagIndex()
+------------------------------------------------------------------------------
+ This gets a list of all the tags that have been set on any task across the
+ instance, presumably to allow some user interface to select from all tags
+ so they can pick one or more for filtering.
+
+ We've implemented fully in memory, which will work with any of our data
+ stores, but would be horribly inefficient for the database mapping, but
+ is the required approach for the YAML mapping.  Someday, we should figure
+ a way for the DataMapper to provide a method that could take advantage
+ of that. 
+============================================================================*/
+func TagIndex(w http.ResponseWriter, r *http.Request) {
+    fmt.Printf("TagIndex(): entry\n")
+    if master.HasChildren() {
+        tags := master.Kids().GetChildTags()
+        if tags != nil {
+            w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+            w.WriteHeader(http.StatusOK)
+            if err := json.NewEncoder(w).Encode(tags); err != nil {
+                panic(err)
+            }
+        } else {
+            errorResponse(w, pimErr(emptyList))    
+        }
+    } else {
+        errorResponse(w, pimErr(emptyList))         
+    }
+}
+
 func TaskIndex(w http.ResponseWriter, r *http.Request) {
+    fmt.Printf("TaskIndex(): made it in\n")
+    vars := mux.Vars(r)
+    strtags := vars["tags"]
+    var tags []string
+    if len(strtags) > 0 {
+        tags = strings.Split(strtags, ",")
+    } else {
+        tags = nil
+    }
+    var kids []TaskJSON = nil
     if master.HasChildren() {
 
-        // convert kids to JSON-ready tasks
-        kids := fromTasks(master.Kids())
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-        w.WriteHeader(http.StatusOK)
+        // if tags filter is here then apply it
+        if tags != nil && len(tags) > 0 {
+            // the second parm says to automatch today and this week
+            // based on dates as well as explicit tag matches
+            matching := master.Kids().FindTagMatches(tags, true)
+            if len(matching) > 0 {
+                kids = fromTasks(matching)
+            }
+        } else {
+            // convert kids to JSON-ready tasks            
+            kids = fromTasks(master.Kids())
+        }
 
-        if err := json.NewEncoder(w).Encode(kids); err != nil {
-            panic(err)
+        if kids != nil {
+            w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+            w.WriteHeader(http.StatusOK)
+            if err := json.NewEncoder(w).Encode(kids); err != nil {
+                panic(err)
+            }
+        } else {
+            errorResponse(w, pimErr(emptyList))    
         }
     } else {
         errorResponse(w, pimErr(emptyList))

@@ -75,6 +75,12 @@ var routes = Routes{
         TaskDelete,
     },
     Route{
+        "TagIndex",
+        "GET",
+        "/tags",
+        TagIndex,
+    },    
+    Route{
         "ServerStatus",
         "GET",
         "/status",

@@ -13,6 +13,10 @@ func (e ErrTaskNotFoundInList) Error() string {
 	return fmt.Sprintf("Could not find task in parent or child list.")
 }
 
+func IsSystemTag(tag string) bool {
+	return tag == "today" || tag == "thisweek"
+}
+
 // TaskState: enum type to track possible states of tasks
 // along with UTF-8 characters to represent each state in the console app
 type TaskState int
@@ -110,6 +114,54 @@ func (list Tasks) FindByCompletionDate(date time.Time) Tasks {
 	return result
 }
 
+
+func (list Tasks) GetChildTags() map[string]int {
+	tags := make(map[string]int)
+	for _, curr := range list {
+		currTags := curr.GetAllTags()
+		for _, tag := range currTags {
+			// we take advantage that int's zero value is zero
+			// so if the tag is not in the map it returns zero
+			tags[tag] = tags[tag] + 1;
+		}
+	}
+	fmt.Printf("GetChildTags(): got tags\n")	
+	return tags;
+}
+
+// given a list of tags find all matches, optionally including "special"
+// processing for system-supported tags such as "today" and
+// "thisweek" which match not only for their tags, but also
+// for their date ranges.
+func (list Tasks) FindTagMatches(tags []string, system bool) Tasks {
+	var result Tasks
+	var addit bool
+	for _, curr := range list {
+		addit = false
+		// fmt.Printf("FindTagMatches(): curr = %v\n", curr)
+		for _, tag := range tags {
+			addit = curr.IsTagSet(tag)
+			if !addit && system && IsSystemTag(tag) {
+				if tag == "today" && curr.IsToday() {
+				    fmt.Printf("FindTagMatches(): tags = %v\n", tags)
+					addit = true
+				}
+				if tag == "thisweek" && curr.IsThisWeek() {
+					addit = true
+				}					
+			}
+			if !addit {
+				break // need all tags to match so break on the first non match
+			}
+		}
+		if addit {
+			result = append(result, curr)
+		}
+	}
+	fmt.Printf("FindTagMatches(): len(result) = %v\n", len(result))
+	return result	
+}
+
 // return a list of all tasks in the list that have the today flag set
 func (list Tasks) FindToday() Tasks {
 	var result Tasks
@@ -127,7 +179,7 @@ func (list Tasks) FindToday() Tasks {
 func (list Tasks) FindThisWeek() Tasks {
 	var result Tasks
 	for _, curr := range list {
-		if curr.IsThisWeek() && !curr.IsComplete() {
+		if curr.IsThisWeek() {
 			result = append(result, curr)			
 		}
 	}
@@ -435,12 +487,8 @@ func (t *Task) SetThisWeek(thisWeekNew bool) {
 	}
 }
 
-func (t *Task) IsThisWeek() bool {
-	// if labeled for this week, then just return true
-	if t.IsTagSet("thisweek") {
-		return true
-	}
-
+// checks if the task's target start time is between sunday and saturday of this week
+func (t *Task) isWithinThisWeek() bool {
 	// if there is no target start time then it's not for this week
 	target := t.GetTargetStartTime()
 	if target == nil {
@@ -461,7 +509,16 @@ func (t *Task) IsThisWeek() bool {
 	dayOfTask := time.Date(target.Year(), target.Month(), target.Day(), 0, 0, 0, 0, target.Location())
 	isThisWeek := (dayOfTask == sunday) || (dayOfTask == saturday) || (dayOfTask.After(sunday) && dayOfTask.Before(saturday))
 	fmt.Printf("IsThisWeek() dayOfTask is between sunday and saturday = %b\n", isThisWeek)
-	return isThisWeek
+	return isThisWeek	
+}
+
+func (t *Task) IsThisWeek() bool {
+	// if labeled for this week, then just return true
+	if t.IsTagSet("thisweek") {
+		return true
+	}
+
+	return t.isWithinThisWeek()
 }
 
 func (t *Task) SetDontForget(dontForgetNew bool) {

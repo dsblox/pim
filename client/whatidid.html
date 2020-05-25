@@ -121,9 +121,7 @@ function myDateChanged(newDate) {
 // let's get the dates of all completed tasks into an array
 // to link to the calendar, so the calendar will only allow
 // us to click on days with tasks completed on them
-// NOTE: this should be working but I cannot get the V-Calendar's
-// available-dates attribute to be reactive and change after
-// we retrieve this data from the server.  So disabling for now!
+currentPage = "history"
 findAllCompletedTaskDates(true);
 
 // call the server to get tasks and put into the days lists

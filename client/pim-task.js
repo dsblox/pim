@@ -1,5 +1,3 @@
-var nSecPerMinute = 60000000000;
-
 function guid() {
   function s4() {
     return Math.floor((1 + Math.random()) * 0x10000)
@@ -20,16 +18,21 @@ var TaskState = {
 // create our basic task view model
 class Task {
 
-  constructor(id, name, startTime, endTime, estimate, complete, today, thisWeek) {
+  constructor(id, name, startTime, endTime, estimate, complete) {
     this.id = id;               // id of the task on the server
     this.name = name;           // name of the task
     this.targetStartTime = startTime; // start time or date
     this.actualCompletionTime = endTime; // completed datetime
     this.estimate = estimate;   // in minutes
-    this.today = today;
-    this.thisWeek = thisWeek;
+    // this.today = today;
+    // this.thisWeek = thisWeek;
     this.state = (complete?TaskState.COMPLETE:TaskState.NOT_STARTED);
+    this.tags = null;
     // this.complete = complete;   // true if the task is done - OBSOLETE
+  }
+
+  getId() {
+    return this.id;
   }
 
   getName() {
@@ -38,6 +41,14 @@ class Task {
 
   setName(newName) {
     this.name = newName;
+  }
+
+  getState() {
+    return this.state;
+  }
+
+  setState(newState) {
+    this.state = newState;
   }
 
   isComplete() {
@@ -68,20 +79,73 @@ class Task {
     this.state = TaskState.ON_HOLD;  
   }
 
+  tagIndex(tag) {
+    if (this.tags == null) {
+      return -1;
+    }
+    return this.tags.indexOf(tag);    
+  }
+
+  isTagSet(tag) {
+    return (this.tagIndex(tag) >= 0);
+  }
+
+  // returns false if tag is already set
+  // TBD: validate tags have no spaces or slashes
+  addTag(tag) {
+    if (this.tags == null) {
+      this.tags = [];
+    }
+    if (this.isTagSet(tag)) {
+      return false;
+    }
+    this.tags.push(tag);
+    return true;
+  }
+
+  getTags() {
+    if (this.tags != null) {
+      return this.tags.join(" / ");
+    }
+    else {
+      return "";
+    }
+  }
+
+  // returns false if tag wasn't set
+  removeTag(tag) {
+    var i = this.tagIndex(tag);
+    if (i >= 0) {
+      this.tags.splice(i,1);
+      return true;
+    }
+    return false;
+  }
+
   isToday() {
-    return this.today;
+    return this.isTagSet("today");
   }
 
   setToday(newToday) {
-    this.today = newToday;
+    if (newToday) {
+      this.addTag("today");
+    }
+    else {
+      this.removeTag("today");
+    }
   }
 
   isThisWeek() {
-    return this.thisWeek;
+    return this.isTagSet("thisweek");
   }
 
   setThisWeek(newThisWeek) {
-    this.thisWeek = newThisWeek;
+    if (newThisWeek) {
+      this.addTag("thisweek");
+    }
+    else {
+      this.removeTag("thisweek");
+    }
   }
 
   // return the esimtate as a number even if null
