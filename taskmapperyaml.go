@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 	"strings"
+	"sync"
 	"io/ioutil"
 	"gopkg.in/yaml.v2"
 )
@@ -126,7 +127,12 @@ func (tm *TaskDataMapperYAML) saveTask(f *os.File, t *Task) error {
 
 
 // dump our tasks into the YAML file
+var mu sync.Mutex
 func (tm *TaskDataMapperYAML) Save(t *Task, saveChildren bool, saveMyself bool) error {
+
+	// mutex holds us here if a Save() is already in progress
+	mu.Lock()
+	defer mu.Unlock()
 
 	// log.Printf("Save(%t, %t): task = %s, id = %s, loaded = %t len(parentIds) = %d", saveChildren, saveMyself, t.name, t.id, tm.loaded, len(tm.parentIds))
 

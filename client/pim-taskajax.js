@@ -100,27 +100,27 @@ function tasksURL(id = "") {
   return makeURL(rest)
 }
 
-function tasksTodayURL(tags = null) {
+function tasksDefaultSystemTagURL(systemTag, tags = null) {
+  var urlTags = [];
   if (tags == null) {
-    tags = ["today"];
+    urlTags.push(systemTag);
   }
   else if (typeof(tags) == "string") {
-    tags = ["today", tags]
+    urlTags = [systemTag, tags]
   }
   else {
-    tags.push("today");
+    tags.map(function(e){urlTags.push(e)});
+    urlTags.push(systemTag);
   }
-  return makeURL("tasks", tags);
+  return makeURL("tasks", urlTags);  
+}
+
+function tasksTodayURL(tags = null) {
+  return tasksDefaultSystemTagURL("today", tags);
 }
 
 function tasksThisWeekURL(tags = null) {
-  if (tags == null) {
-    tags = ["thisweek"];
-  }
-  else {
-    tags.push("thisweek");
-  }
-  return makeURL("tasks", tags);
+  return tasksDefaultSystemTagURL("thisweek", tags);
 }
 
 function tasksCompleteURL(tags = null) {

@@ -36,7 +36,12 @@ class Task {
   }
 
   getName() {
-    return this.name;
+    if (this.name && this.name.length > 0) {
+      return this.name;
+    }
+    else {
+      return "<unnamed task>";
+    }
   }
 
   setName(newName) {

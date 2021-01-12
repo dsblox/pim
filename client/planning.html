@@ -4,10 +4,21 @@
 <meta charset="utf-8"> 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- LOCAL VERSIONS -->
+
+<!-- Trying Bootstrap 4 - move into correct place later -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+
+<script src="https://use.fontawesome.com/041d5ecc63.js"></script>
+
+
+<!-- LOCAL VERSIONS 3.3.7 
 <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap.min.css">
 <script src="jquery/3.2.1/jquery.min.js"></script>
-<script src="bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="bootstrap/3.3.7/js/bootstrap.min.js"></script
+-->
 <script src="vue/2.6.11/vue.js"></script>
 
 <!-- CDN VERSIONS -->
@@ -20,6 +31,7 @@
 <!-- script src="https://unpkg.com/axios@0.12.0/dist/axios.min.js"></script -->
 <!-- script src="https://unpkg.com/lodash@4.13.1/lodash.min.js"></script -->
 <!-- script src="https://cdnjs.cloudflare.com/ajax/libs/vue-strap/1.1.29/vue-strap.min.js"></script -->
+
 
 <!-- my CSS overrides -->
 <link rel="stylesheet" href="pim.css">
@@ -37,29 +49,56 @@
 </head>
 
 <body>
-<nav class="navbar navbar-default">
-  <div class="container-fluid">
-    <div class="navbar-header">
-      <a class="navbar-brand" href="#">PIM</a>
-    </div>
-    <ul class="nav navbar-nav">
-      <li><a href="vuepim.html">Today</a></li>
-      <li class="active"><a href="planning.html">Planning</a></li> 
-      <li><a href="whatidid.html">History</a></li> 
-      <li><a href="#">Mission</a></li> 
+
+
+<nav class="navbar navbar-default navbar-expand-sm navbar-light bg-light rounded">
+  <a class="navbar-brand" href="#">PIM</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsCollapsible" aria-controls="navbarsCollapsible" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarsCollapsible">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="vuepim.html">Home</a>
+      </li>
+      <li class="nav-item active">
+        <a class="nav-link" href="planning.html">Planning<span class="sr-only">(current)</span></a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="whatidid.html">History</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled" href="#">Mission</a>
+      </li>
     </ul>
-    <ul class="nav navbar-nav navbar-right">
-      <li><a href="#"><span class="glyphicon glyphicon-user"></span> Sign Up</a></li>
-      <li><a href="#"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
-    </ul>
+    <div class="nav navbar-nav nav-center">
+        <div class="alert-float" style="position: absolute; top: 0; left: 10px; right: 10px; z-index: 9999; width: 100%" id="err">
+          <div class="alert alert-danger alert-dismissible show" role="alert" id=errortext>
+            OK
+            <button type="button" class="close" aria-label="Close" onclick="$('#err').hide()">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+        </div>
+    </div>    
+    <ul class="nav navbar-nav ml-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="#"><span class="fa fa-user"></span> Sign Up</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#"><span class="fa fa-sign-in"></span> Login</a>
+      </li>
+    </ul>    
   </div>
 </nav>
 
+
 <div id="pim-root" class="container-fluid">
 
-<h1 class="text-center bg-primary lead">
-	Daily Planning
-</h1>
+<div class="row ml-0 mr-0 mb-0 p-0">
+  <pim-title-bar title="Daily Planning" :tags="allTags" :selected="selectedTags" :add="false" />
+</div>
 
 <div class="row">
 
@@ -69,7 +108,7 @@
 
 
   <div class="col-sm-6">
-    <pim-task-list :task-list="planDay" title="Daliy Goals" add="true" day="true" v-on:toggle="adjustTask" />
+    <pim-task-list :task-list="planDay" title="Daily Goals" add="true" day="true" v-on:toggle="adjustTask" />
   </div>
 
 </div>
@@ -115,7 +154,7 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-warning" data-dismiss="modal" onclick="deleteTask()" id="delete">Delete Task</button>
           <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="cancelModal()" id="cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="upsertTask('planning')" id="save">Save Task</button>
+          <button type="submit" class="btn btn-primary" data-dismiss="modal" onclick="upsertTask('planning')" id="save">Save Task</button>
         </div>
       </form>
     </div>
@@ -124,6 +163,17 @@
 
 
 <script>
+
+// error block in center of nav to display dismissable errors
+// leaving the text-set here to remind me that the hide/show is
+// on a different element than the text itself.  Note the alert()
+// call resets the close box.  Danger - close() currently deletes
+// the alert - we just want it to hide on clicking the x.
+// I'm not actually using this yet - but it's here when I need it
+// pimShowError("my error text");
+$('#err').hide();
+$('#err3').hide(); // until we get rid of 3
+
 
 
 // handle the DISPLAY of the New/Edit Modal Dialog
@@ -179,10 +229,24 @@ $('#myModal').on('show.bs.modal', function (event) {
   	modal.find('.modal-title').text(title)
 })
 
+// the menu - to be moved into central js file
+// and ideally bound to a vue component
+var menu = [
+  { display: 'Home',     route: 'vuepim.html'},
+  { display: 'Planning', route: 'planning.html'},
+  { display: 'History',  route: 'whatidid.html'},
+  { display: 'Mission',  route: '#'}
+]
+var menuSelected = 'Planning';
+
 // call the server to get tasks and put into the lists
 currentPage = "planning"
 loadTasksThisWeek();
 loadTasksThisDay();
+
+// all the tags are loaded into global allTags
+tagsFindAll();
+
 
 // here is a root Vue to hold references to my models
 // the data references can be linked to components
@@ -194,7 +258,11 @@ new Vue({
     done: done,
     planWeek : planWeek,
     planDay : planDay,
-    states: TaskState
+    states: TaskState,
+    selectedTags: selectedTags,
+    allTags: allTags,
+    menu: menu,
+    menuSelected: menuSelected,
   },
   methods: {
     adjustTask: function(task) { 

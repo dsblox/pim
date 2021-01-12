@@ -4,31 +4,39 @@
 <meta charset="utf-8"> 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- LOCAL VERSIONS -->
+<!-- Trying Bootstrap 4 - move into correct place later -->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+
+<script src="https://use.fontawesome.com/041d5ecc63.js"></script>
+
+<!-- LOCAL VERSIONS 3.3.7 
 <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap.min.css">
 <script src="jquery/3.2.1/jquery.min.js"></script>
-<script src="bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="bootstrap/3.3.7/js/bootstrap.min.js"></script
+-->
 <script src="vue/2.6.11/vue.js"></script>
-
-
-<!-- installing requires a bunch of dependencies - so I can't use this page offline for now -->
-<script src='https://unpkg.com/v-calendar@next'></script>
-
-
-
 
 <!-- CDN VERSIONS -->
 <!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" -->
-<!-- link rel="stylesheet" href="https://unpkg.com/bootstrap-datepicker@1.9.0/dist/css/bootstrap-datepicker3.min.css" -->
 <!-- script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script -->
 <!-- script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script -->
-<!-- script src="https://unpkg.com/bootstrap-datepicker@1.9.0/dist/js/bootstrap-datepicker.min.js"></script -->
 <!-- script src="https://unpkg.com/vue"></script -->
 
 <!-- the following three libraries I believe I tried using but never actually used -->
 <!-- script src="https://unpkg.com/axios@0.12.0/dist/axios.min.js"></script -->
 <!-- script src="https://unpkg.com/lodash@4.13.1/lodash.min.js"></script -->
 <!-- script src="https://cdnjs.cloudflare.com/ajax/libs/vue-strap/1.1.29/vue-strap.min.js"></script -->
+
+<!-- my CSS overrides -->
+<link rel="stylesheet" href="pim.css">
+<script src="pim-bootstrap.js"></script>
+
+<!-- installing requires a bunch of dependencies - so I can't use this page offline for now -->
+<script src='https://unpkg.com/v-calendar'></script>
+
 
 <!-- The following must be in order - look for a new tool to improve this -->
 <script src="pim-bootstrap.js"></script>
@@ -43,18 +51,28 @@
 </head>
 
 <body>
-<nav class="navbar navbar-default">
-  <div class="container-fluid">
-    <div class="navbar-header">
-      <a class="navbar-brand" href="#">PIM</a>
-    </div>
-    <ul class="nav navbar-nav">
-      <li><a href="vuepim.html">Today</a></li>
-      <li><a href="planning.html">Planning</a></li> 
-      <li class="active"><a href="whatidid.html">History</a></li> 
-      <li><a href="#">Mission</a></li> 
+<nav class="navbar navbar-default navbar-expand-sm navbar-light bg-light rounded">
+  <a class="navbar-brand" href="#">PIM</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsCollapsible" aria-controls="navbarsCollapsible" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarsCollapsible">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="vuepim.html">Home</span></a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="planning.html">Planning</a>
+      </li>
+      <li class="nav-item active">
+        <a class="nav-link" href="whatidid.html">History <span class="sr-only">(current)</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled" href="#">Mission</a>
+      </li>
     </ul>
-    <ul class="nav navbar-nav nav-center">
+    <div class="nav navbar-nav nav-center">
         <div class="alert-float" style="position: absolute; top: 0; left: 10px; right: 10px; z-index: 9999; width: 100%" id="err">
           <div class="alert alert-danger alert-dismissible show" role="alert" id=errortext>
             OK
@@ -63,19 +81,23 @@
             </button>
           </div>
         </div>
-    </ul>        
-    <ul class="nav navbar-nav navbar-right">
-      <li><a href="#"><span class="glyphicon glyphicon-user"></span> Sign Up</a></li>
-      <li><a href="#"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
-    </ul>
+    </div>    
+    <ul class="nav navbar-nav ml-auto">
+      <li class="nav-item">
+        <a class="nav-link" href="#"><span class="fa fa-user"></span> Sign Up</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#"><span class="fa fa-sign-in"></span> Login</a>
+      </li>
+    </ul>    
   </div>
 </nav>
 
 <div id="pim-root" class="container-fluid">
 
-<h1 class="text-center bg-primary lead">
-	What I Did
-</h1>
+<div class="row ml-0 mr-0 mb-0 p-0">
+  <pim-title-bar title="What I Did" :tags="allTags" :selected="selectedTags" :add="false" />
+</div>
 
 <div class="row">
 

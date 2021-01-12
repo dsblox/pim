@@ -14,6 +14,17 @@
 }
 
 .close {
-	margin-top: 4px;
+  line-height: 0px;
+}
+
+/* override list-group-item which is used for task names */
+.task-name {
+  font-size: 0.95rem;
+  color: #555555;
+}
+
+/* I hate Bootstrap 4's bg-primary - changing to be closer to 3 */
+.bg-primary {
+    background-color: #0077cc!important;
 }
 

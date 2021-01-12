@@ -46,19 +46,24 @@ var completedTaskDates = [];
 --------------------------------------------------------------------------
  GLOBALS - that tend to span pages
 ------------------------------------------------------------------------*/
-var currentPage = null; // recently added - not sure it is dependable
-var selectedTag = null; // only currently implemented on TODAY page
-var allTags     = [];   // list of all tags in popularity order
+var currentPage  = null; // recently added - not sure it is dependable
+var selectedTags = [];   // list of which tags are selected for filtering
+var allTags      = [];   // list of all tags in popularity order
+var currTags     = [];   // list of tags in the current task for modal
 
 
 /*
 =========================================================================
- selectTag(tag)
+ toggleTag(tag), selectTag(tag), deselectTag(tag)
 -------------------------------------------------------------------------
- For now you can filter to one non-system tag at a time by chooseing
- the tag picker, which calls this function each time a new tag is
- chosen.  We basically clear and reload the screen from the server
- when you choose a tag. 
+ You can filter to any number of tags (tasks that have ALL selected tags
+ set on them are displayed) by either calling select or deselect (to add
+ or remove a tag selection), or by calling toggleTag() to turn a filter
+ on/off (which is what the UI currently uses - calling toggle any time
+ a tag is clicked).
+
+ We (perhaps inefficiently) clear and reload the screen from the server 
+ whenever you choose a tag.
 
  Inputs: tag - user-defined tag to filter to
 
@@ -66,31 +71,80 @@ var allTags     = [];   // list of all tags in popularity order
       require a server call - just remove the non-selected tags from
       each view.
 
- TBD: Data-bind the selectedTag somehow so things happen more auto-vue-
+ TBD: Data-bind the selectedTags somehow so things happen more auto-vue-
       magically? We've set it up to bind to the selector control, but
       not the lists.
 ========================================================================*/
-function selectTag(tag) {
-  console.log("selectTag(): tag = " + tag)
-  if (tag == 'All') {
-    selectedTag = null;
-  }
-  else {
-    selectedTag = tag;
-  }
-  // console.log(currentPage)
+function reloadOnTagChange() {
   if (currentPage == 'today') {
     scheduled.clean();
     done.clean();
     stuff.clean();
     inprogress.clean();
-    loadTasksToday(selectedTag);
+    loadTasksToday(selectedTags);
   }
   if (currentPage == "planning") {
     planWeek.clean()
     planDay.clean()
-    loadTasksThisWeek(selectedTag);
-    loadTasksThisDay(selectedTag);
+    loadTasksThisWeek(selectedTags);
+    loadTasksThisDay(selectedTags);
+  }  
+}
+
+function selectTag(tag, selectOne = false) {
+  var somethingChanged = true;
+
+  if ((selectedTags.length == 0 && tag == 'All') || 
+      (selectedTags.indexOf(tag) != -1)) {
+    somethingChanged = false;
+  }
+  else if (tag == 'All') {
+    while (selectedTags.length > 0) {
+      selectedTags.pop()
+    }
+  }
+  else {
+    if (selectOne) {
+      while (selectedTags.length > 0) {
+        selectedTags.pop()
+      }
+    }
+    selectedTags.push(tag);    
+  }
+
+  if (somethingChanged) {
+    reloadOnTagChange();
+  }
+
+  return somethingChanged;
+}
+
+function deselectTag(tag) {
+  var somethingChanged;
+  const idxOf = selectedTags.indexOf(tag);
+
+  // you can't deleselect All or a tag not selected
+  // just leave with false meaning no change
+  if (tag == 'All' || idxOf == -1) {
+    somethingChanged = false;
+  }
+  else {
+    selectedTags.splice(idxOf, 1);
+    somethingChanged = true;
+  }
+
+  if (somethingChanged) {
+    reloadOnTagChange();
+  }
+  return somethingChanged;  
+}
+
+function toggleTag(tag) {
+  if (tag == 'All' || selectedTags.indexOf(tag) == -1) {
+    return selectTag(tag);
+  }
+  else {
+    return deselectTag(tag);
   }
 }
 
@@ -243,7 +297,7 @@ function cancelModal() {
  returns either:
    * the task - if it was found and the "task" return type was requested
    * the list - if it was found and the "list" return type was requested
-   * null - if it was not nfound
+   * null - if it was not found
 
  Inputs: TaskList list       - the TaskList to search
          string   id         - the id of the task being sought
@@ -559,14 +613,14 @@ function planTaskIntoWeek(task) {
 }
 function loadTasksThisWeek(tags = null) {
   planningIdLastIncomplete = null;
-  collectTasks(tasksThisWeekURL(), planTaskIntoWeek)
+  collectTasks(tasksThisWeekURL(tags), planTaskIntoWeek)
 }
 
 function planTaskIntoDay(task) {
   planDay.insertTask(task)
 }
 function loadTasksThisDay(tags = null) {
-  collectTasks(tasksTodayURL(), planTaskIntoDay)
+  collectTasks(tasksTodayURL(tags), planTaskIntoDay)
 }
 
 
@@ -677,6 +731,10 @@ function findAllCompletedTaskDates() {
  the UI doesn't actually need them).
 ========================================================================*/
 function tagsDoneFinding(mapTags) {
+  // these system tags shouldn't be displayed to the user
+  delete mapTags.today  
+  delete mapTags.thisweek
+
   while (allTags.length) {
     allTags.pop()
   }

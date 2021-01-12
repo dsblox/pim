@@ -141,6 +141,9 @@ func Index(w http.ResponseWriter, r *http.Request) {
  is the required approach for the YAML mapping.  Someday, we should figure
  a way for the DataMapper to provide a method that could take advantage
  of that. 
+
+ Result is a map with tags as the key and the numnber of instances of that
+ tag as the value.  This is to let the caller know how "popular" each tag is.
 ============================================================================*/
 func TagIndex(w http.ResponseWriter, r *http.Request) {
     fmt.Printf("TagIndex(): entry\n")
