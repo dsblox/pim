@@ -17,6 +17,16 @@
  operation (create, replace, update, delete) against it on the server.
 ========================================================================*/
 
+// utility function to let the user know about ajax errors
+function pimAjaxError(response) {
+  try {
+    r = JSON.parse(response);
+    pimShowError(r.msg)
+  }
+  catch {
+    pimShowError("Invalid JSON returned from server: " + response);
+  }
+}
 
 // set local to true to convert date to local timezone
 // typically we want them in the local time zone when we are in weekly / daily views
@@ -320,6 +330,15 @@ function createTask(task) {
 
 function replaceTask(task) {
   writeTask(task, "PUT");
+}
+
+function createOrReplaceTask(task) {
+  if (task.getId() == null) {
+    createTask(task) 
+  }
+  else {
+    replaceTask(task)
+  }  
 }
 
 

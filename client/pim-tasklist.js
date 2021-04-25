@@ -27,6 +27,18 @@ class TaskList {
     this.tasks.map(function(t){if(t.isTaskSet(tag)) { this.removeTask(t);} });
   }
 
+  // make this look like JavaScript array filter but return a tasklist
+  filter(callback, thisarg) {
+    var newlist = new TaskList()
+    newlist.tasks = this.tasks.filter(callback, thisarg)
+    return newlist
+  }
+  sort(callback, thisarg) {
+    var newlist = new TaskList()
+    newlist.tasks = this.tasks.sort(callback, thisarg)
+    return newlist    
+  }
+
   // add a task and keep in time order unless requested not to
   insertTask(task, placement = 'end') {
 
@@ -105,7 +117,15 @@ class TaskList {
 
   // remove a task from the list
   removeTask(task) {
-    var i = this.tasks.indexOf(task);
+    // if there is no id all we can do is find the same
+    // instance of the task, but if we have an id we can
+    // look up the task by id - even if not the same instance
+    // of the task that is in the list.
+    t = task;
+    if (task.hasId()) {
+      t = this.findTask(task.getId())
+    }
+    var i = this.tasks.indexOf(t);
     if (i >= 0) {
       this.tasks.splice(i,1);
     }
@@ -118,14 +138,8 @@ class TaskList {
 
   // find a task by id
   findTask(id) {
-    var len = this.tasks.length;
-    var result = null;
-  	for (var i = 0; i < len && result == null; i++) {
-  		if (this.tasks[i].id == id) {
-  			result = this.tasks[i];
-  		}
-  	}
-  	return result;
+    var result = this.tasks.find(t => t.id == id )
+    return result==undefined?null:result
   }
 
   // recompute the estimated duraction of the entire list

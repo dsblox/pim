@@ -16,22 +16,45 @@
 ========================================================================*/
 
 /*
---------------------------------------------------------------------------
- TODAY page
-------------------------------------------------------------------------*/
-var scheduled = new TaskList();
-var stuff = new TaskList();
-var done = new TaskList();
-var inprogress = new TaskList();
+=========================================================================
+ Navigation Menu
+-------------------------------------------------------------------------
+ Our navigation component can be passed a menu, and this is what they
+ all use.  Soon we'll likely go SPA so this will only be used once.
+=======================================================================*/
+var mainMenu = [
+  { display: 'Home',     route: "vuepim.html"  },
+  { display: 'Planning', route: "planning.html"},
+  { display: 'History',  route: "whatidid.html"},
+  { display: 'Mission',  route: "#"            },
+]
+
+/*
+=========================================================================
+ Alert
+-------------------------------------------------------------------------
+ Assumes the root Vue app instance is in a global named "v" and this
+ function simply invokes the error box by setting it's message.  The
+ rest of the work is done in the vue-app and pim-alert component.
+ Keeping this abstraction for easy use from throughout even those it
+ has the ugliness of the knowledge of the root vue instance name.
+=======================================================================*/
+function pimShowError(message) {
+  v.warn(message)
+}
+
 
 /*
 --------------------------------------------------------------------------
- PLANNING page
+ TODAY page - load all tasks and let the component lists choose
 ------------------------------------------------------------------------*/
-var planWeek = new TaskList();
-planWeek.setId("PW");
-var planDay = new TaskList();
-planDay.setId("PD");
+var todaylist = new TaskList();
+
+/*
+--------------------------------------------------------------------------
+ PLANNING page - load all tasks and let the component lists choose
+------------------------------------------------------------------------*/
+var planninglist = new TaskList();
 
 /*
 --------------------------------------------------------------------------
@@ -46,11 +69,9 @@ var completedTaskDates = [];
 --------------------------------------------------------------------------
  GLOBALS - that tend to span pages
 ------------------------------------------------------------------------*/
-var currentPage  = null; // recently added - not sure it is dependable
 var selectedTags = [];   // list of which tags are selected for filtering
 var allTags      = [];   // list of all tags in popularity order
 var currTags     = [];   // list of tags in the current task for modal
-
 
 /*
 =========================================================================
@@ -60,37 +81,16 @@ var currTags     = [];   // list of tags in the current task for modal
  set on them are displayed) by either calling select or deselect (to add
  or remove a tag selection), or by calling toggleTag() to turn a filter
  on/off (which is what the UI currently uses - calling toggle any time
- a tag is clicked).
+ a tag is clicked).  Note that the UI components are simply bound to
+ the selectedTags array and automatically refresh themselves as tags are
+ added or removed from the array.
 
- We (perhaps inefficiently) clear and reload the screen from the server 
- whenever you choose a tag.
+ Note that tag-toggling is a UI-only concept and requires no AJAX
+ AJAX calls - which means we may want to consider moving this
+ functinonality into a Vue component.
 
- Inputs: tag - user-defined tag to filter to
-
- TBD: Consider the move from ALL tags to just one.  That should not
-      require a server call - just remove the non-selected tags from
-      each view.
-
- TBD: Data-bind the selectedTags somehow so things happen more auto-vue-
-      magically? We've set it up to bind to the selector control, but
-      not the lists.
+ Inputs: tag - user-defined tag to add or remove from selected tags
 ========================================================================*/
-function reloadOnTagChange() {
-  if (currentPage == 'today') {
-    scheduled.clean();
-    done.clean();
-    stuff.clean();
-    inprogress.clean();
-    loadTasksToday(selectedTags);
-  }
-  if (currentPage == "planning") {
-    planWeek.clean()
-    planDay.clean()
-    loadTasksThisWeek(selectedTags);
-    loadTasksThisDay(selectedTags);
-  }  
-}
-
 function selectTag(tag, selectOne = false) {
   var somethingChanged = true;
 
@@ -112,10 +112,6 @@ function selectTag(tag, selectOne = false) {
     selectedTags.push(tag);    
   }
 
-  if (somethingChanged) {
-    reloadOnTagChange();
-  }
-
   return somethingChanged;
 }
 
@@ -133,9 +129,6 @@ function deselectTag(tag) {
     somethingChanged = true;
   }
 
-  if (somethingChanged) {
-    reloadOnTagChange();
-  }
   return somethingChanged;  
 }
 
@@ -148,435 +141,184 @@ function toggleTag(tag) {
   }
 }
 
+
 /*
 =========================================================================
- upsertTask()
+ modalTaskSave()
 -------------------------------------------------------------------------
  This is called from the modal when the Save button is clicked to 
- manually collect the form elements, create a Task object, and call
- the server to save / create it as specified by the state of the
- modal.  If that wasn't enough, it manually puts the modified task into
- all the right lists depending on which view was passed in.
+ handle any automatic system tags, call the server to save / create the
+ task and make sure it ends up in the list that was given to the modal
+ when it was invoked.
+ 
+ Inputs: modalTask - the task to be written to the server.  If it has an
+                     id we will replace on the server, if not we will
+                     create a new task
+         list      - the list to add the task to - typically the list
+                     for the complete list of tasks for the current page.
+         sysTags   - a list of tags that should be auto-added to any
+                     task created or edited on this modal.  Used to make
+                     sure all new 'today' tasks have the 'today' tag
+                     (for example).
 
- Inputs: view - the current page so it knows which lists to change
-                TBD: just change all the lists and let the UI take
-                     care of itself?
-
- TBD: do the modal in vue at some point so this doesn't feel like such
-      a hack.
+ TBD: consider moving more of this function into the vue component(s)?
 ========================================================================*/
-// note this only adds new tags - it doesn't make
-// the tags set on the task "match" the string
-// (for example, by removing tags not in the string)
-function setTagsFromString(task, strTags) {
-  if (strTags.length > 0) {
-    var tags = strTags.split("/").map(function(e){return e.trim();});
-    tags.map(function(e){return task.addTag(e);});
+function modalTaskSave(modalTask, list, sysTags) {
+  var t = modalTask;
+
+  if (sysTags != null) {
+    sysTags.forEach(function(sysTag) { t.addTag(sysTag) })
   }
-}
 
-function upsertTask(view) {
-	var t = null;
-	var f = document.getElementById("newTask");
-	var name    = f.elements["task"].value;
-  var strdate = f.elements["startdate"].value;
-	var strtime = f.elements["starttime"].value;
-	var today   = (f.elements["today"].value == "true"); // hidden field useable by every UI
-	var time = null;
-  var strtags = f.elements["tags"].value;
+  // write the task to the server
+  createOrReplaceTask(t)
 
-	if (strtime.length > 0) {
-		// if date not specified, assume today		
-		if (strdate.length == 0) {
-			var today = new Date();
-			strdate = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();			
-		}
-		// remember time will be sent in local time zone
-		// with TZ info and will be stored in GMT		
-		time = new Date(strdate + " " + strtime);
-	}
+  // add the task to the list the modal wants to use
+  if (list != null) {
+    list.insertTask(t)
+  }
 
-	if ((strtime.length > 0) && (strdate.length > 0)) {
-		// remember time will be sent in local time zone
-		// with TZ info and will be stored in GMT
-	  	time = new Date(strdate + " " + strtime);
-	}
-	// console.log("upsertTask: time=" + time);
-
-
-	// we decide whether or not to set the thisweek flag based on the hidden field
-	var thisWeek = (f.elements["thisweek"].value == "true"); // hidden field useable by every UI
-
-	var duration = parseInt(f.elements["duration"].value);
-	if (isNaN(duration)) {
-		duration = null;
-	}
-	if (currTask == null) {
-		t = new Task(null, name, time, null, duration, false);
-    t.setToday(today);
-    t.setThisWeek(thisWeek);
-    setTagsFromString(t, strtags);
-    createTask(t); // create a new task on the server
-
-
-    if (view == 'planning') {
-    	if (thisWeek) {
-    		planWeek.insertTask(t);
-  		}
-  		else if (today) {
-        planDay.insertTask(t);
-    	}
- 		}
- 		else {
-			var list = stuff;
-			var sort = false;
-			if (time != null) {
-				list = scheduled;
-				sort = true;
-			}
- 			list.insertTask(t, sort?'targetstarttime':'end');
- 		}
- 		// console.log("upsertTask: new task id=" + t.id);
- 		// tbd: put the id into the local version of the task
-	} else {
-		t = currTask;
-		t.setName(name);
-		t.setTargetStartTime(time);
-		t.setEstimate(duration);
-    // these may be redundant - we should clean up or separate the
-    // system tags like today/thisweek from user-defined tags
-    t.setToday(today);
-    t.setThisWeek(thisWeek);
-    setTagsFromString(t, strtags);
-
-		moveTask(t); // adjust the task to show in all the right lists
-		currTask = null;
-    replaceTask(t); // set all the fields on this task
-	}
+  return t;
 }
 
 /*
 =========================================================================
- deleteTask()
+ deleteTask() - this is now in the new April 2021 approach
 -------------------------------------------------------------------------
- This always deletes the current task, which is always the one in the
- modal in the UI.  It decides not to care about the view, just removing
- the task from all of them (except history where the modal doesn't
- currently display - but probably should and will soon).
+ This is called from the UI components when a task should be deleted.
+ Today it simply invokes the server to delete the task.  Someday it
+ may be enhanced to mark the task as dirty and synchronize at some
+ interval (which is why we have this layer here instead of calling the
+ server directly from the UI components).
 ========================================================================*/
-function deleteTask() {
-	if (currTask == null) {
+function deleteTask(task) {
+	if (task == null) {
 		return;
 	}
 
-	// remove task from any list it is in
-	done.removeTask(currTask);
-	stuff.removeTask(currTask);
-	scheduled.removeTask(currTask);
-  planWeek.removeTask(currTask);
-  planDay.removeTask(currTask);
-
   // delete the task from the server (when we write it)
-  killTask(currTask);
-
-	// remove what we hope is the last reference to the task
-	currTask = null;
-}
-
-
-function cancelModal() {
-	currTask = null;
+  killTask(task);
 }
 
 
 /*
 =========================================================================
- findTaskInList()
+ changeTaskState() - this is the new approach April 2021!!!
 -------------------------------------------------------------------------
- This heavily used funciton searches the specified list for an id and
- returns either:
-   * the task - if it was found and the "task" return type was requested
-   * the list - if it was found and the "list" return type was requested
-   * null - if it was not found
+ This function is invoked anytime the state of a task changes, with
+ possible states being not-started, in-progress, or complete.  This
+ function takes care of marking the completion time of the task (or
+ clearing it if a completed task is marked incomplete).
 
- Inputs: TaskList list       - the TaskList to search
-         string   id         - the id of the task being sought
-         string   returnType - 'task' or 'list'
-========================================================================*/
-function findTaskInList(list, id, returnType) {
-	found = null;
-	found = list.findTask(id);
-	if (found != null) {
-		if (returnType == 'task') {
-			return found;
-		}
-		else if (returnType == 'list') {
-			return list;
-		}
-		else {
-			console.log("findTaskInList: returnType must be list or task, got: " + returnType)
-			return null;
-		}
-	}
-	else {
-		return null;
-	}
-}
+ For now, we do real-time notification of the server as we do in all
+ places, but in the future we may choose to collect "dirty" tasks here
+ and perform intermittent synchronization to the server.
 
-// search all the lists for the task and return the list it was in
-function findTaskInPIMList(id, returnType) {
-	found = null;
-	found = findTaskInList(scheduled, id, returnType);
-	if (!found) {
-		found = findTaskInList(stuff, id, returnType);
-	}
-	if (!found) {
-		found = findTaskInList(done, id, returnType);
-	}
-  if (!found) {
-    found = findTaskInList(inprogress, id, returnType);
-  }
-	if (!found) {
-		findTaskInList(planWeek, id, returnType);
-	}
-	if (!found) {
-		findTaskInList(planDay, id, returnType);
-	}
-	return found;	
-}
-
-function listOfTask(id) {
-	return findTaskInPIMList(id, 'list');
-}
-
-// search all the lists for the task
-function findTask(id) {
-	return findTaskInPIMList(id, 'task');
-}
-
-function extractTimeString(timestamp) {
-	if (timestamp == null) {
-		return null;
-	}
-	var hr = timestamp.getHours();
-	var mn = timestamp.getMinutes();
-	var hrstr = (hr < 10 ? "0" + hr : hr);
-	var mnstr = (mn < 10 ? "0" + mn : mn);
-	return hrstr + ":" + mnstr + ":" + '00';
-}
-
-function extractDateString(timestamp) {
-  if (timestamp == null) {
-    return null;
-  }
-  try {
-  	parts = timestamp.toISOString().split("T");
-  	strDate = parts[0];
-  }
-  catch (err) {
-  	console.log("invalid date: " + err);
-  	strDate = null;
-  }
-  return strDate;  
-}
-
-function taskListFromID(id) {
-	var result = null;
-	switch (id) {
-		case "C": result = scheduled; break;
-		case "S": result = stuff;     break;
-		case "D": result = done;      break;
-		case "PW": result = planWeek; break;
-		case "PD": result = planDay;  break;
-	}
-	return result;
-}
-
-/*
-=========================================================================
- moveTask()
--------------------------------------------------------------------------
- This heavily used function is called when a task is marked completed
- or "unmarked" completed - it moves the task from list to list in the UI
- based on it's previous and new state, and updates the task on the
- server to reflect its new state.
-========================================================================*/
-function moveTask(task) {
+ Inputs: task - whose state has changed
+ Result: task is written to the server as needed to persist the change
+=======================================================================*/
+function changeTaskState(task) {
   if (task == null) { return; }
 
-  // console.log("in moveTask(): complete="+task.isComplete());
-
   if (task.isComplete()) {
-
-
-    // if it is in the weekly list then move it to the bottom
-    if (planWeek.isHere(task)) {
-        planWeek.removeTask(task);
-        planWeek.insertTask(task);
-    }
-
-    // make sure it is in the done list
-    done.insertTask(task, false);
-
-    // make now it's completion time
     now = new Date();
     task.setActualCompletionTime(now.toJSON());
-
-    // if it was in the scheduled or stuff lists remove it
-    scheduled.removeTask(task);
-    stuff.removeTask(task);
-    inprogress.removeTask(task);
-
-    // when we update change the state and completion time
-    task.dirty = ["state", "actualcompletiontime"];
-
-  } else if (task.isInProgress()) {
-
-    inprogress.insertTask(task, false);
-    scheduled.removeTask(task);
-    stuff.removeTask(task);
-    done.removeTask(task);
-
-    // when we update change the state and completion time
-    task.dirty = ["state"];
-
-  // else back to not started
-  } else {
-
-    // remove from done list if it was there
-    done.removeTask(task);
-    inprogress.removeTask(task);
-
-    // clear any completion time if its not really done
-    task.setActualCompletionTime(null);
-
-    // put it into scheduled or stuff by whether it has startTime
-    if (task.hasStartTime()) {
-      scheduled.insertTask(task, 'targetstarttime');
-      stuff.removeTask(task);
-    } else {
-      stuff.insertTask(task);
-      scheduled.removeTask(task);
+    task.dirty = ["state", "actualcompletiontime"];    
+  }
+  else if (task.isInProgress() || task.isNotStarted()) {
+    if (task.hasCompletionTime()) {
+      task.setActualCompletionTime(null); // clear completion time since not really done
+      task.dirty = ["state", "actualcompletiontime"];    
     }
-
-    // when we update change the state and completion time
-    task.dirty = ["state", "actualcompletiontime", "targetstarttime"];
+    else {
+      task.dirty = ["state"];          
+    }
   }
 
   // call the server to update the task persistently
-  // only changing the state and completion time
-  updateTask(task);
+  // only changing the "dirty" elements
+  updateTask(task);    
 }
 
-function toggleTask(task) {
-    if (task == null) { return; }
+/*
+=========================================================================
+ clearTagFromList() - this is the new approach April 2021!!! but isn't fully clean yet
+-------------------------------------------------------------------------
+ This function is invoked from a task-list when the user has asked to
+ clear a particular tag from all items in the list.  This is typically
+ used for a system tag to "archive" a bunch of items off the screen,
+ such as clearing your "done" list on the today view to get ready for
+ the next day.
 
-    // change the state of the task
-    // not sure why double-binding doesn't
-    // make this happen automatically
-    if (task.isComplete()) {
-        task.markNotStarted();
-    }
-    else {
-        task.markComplete();
-    }
-    // console.log("toggleTask(): complete="+task.complete)
+ For now, we do real-time notification of the server as we do in all
+ places, but in the future we may choose to collect "dirty" tasks here
+ and perform intermittent synchronization to the server.
 
-    moveTask(task);
+ Inputs: list          - of tasks that want the tag removed
+         tagToClear    - this tag should be taken off all tasks
+         onlyCompleted - a safety feature since usually only completed
+                         tasks will have a tag cleared
+
+ Result: tag is cleared from all tasks, all tasks are persisted
+=======================================================================*/
+function clearTagFromList(list, tagToClear, onlyCompleted) {
+  list.tasks.forEach(function(t) { 
+    var attemptToRemove = (t.isComplete() || !onlyCompleted)
+    if (attemptToRemove && t.removeTag(tagToClear)) {
+      t.resetTags = [tagToClear]
+      t.setTags = []
+      updateTask(t)
+    }
+  } )
 }
 
-// badly named function because we only clear tasks that
-// are in the list, marked done, and clear them of the specified tag
-function clearTagAndList(list, tagToClear) {
-  // only today and thisweek are currently supported
-  // once we properly implement tags in the JS Task
-  // object we can generalize this better
-  if (!(tagToClear == 'today' || tagToClear == 'thisweek')) {
-    return;
+/*
+=========================================================================
+ writeToday - in April 2021 approach
+-------------------------------------------------------------------------
+ This function is specifically for the today tag when it is turned on
+ or off on a task to write the change to the server.  Today it simply
+ writes the change, but in the future it may enqueue changes and sync
+ intermittently, which is why we haven't moved persistence into the 
+ UI components.
+
+ Input:  task that has been changed to have today on/off
+ Result: the current state of the today tag is written to the server
+========================================================================*/
+// called from vue component when "move to/from today" control clicked
+function writeToday(task) {
+  if (task.isToday()) {
+    task.setTags = ['today'];
   }
-
-  var lenClear = list.tasks.length;
-  // go backwards so we can remove items from the end
-  // and do the loop for both server and UI
-  for (var idxClear = lenClear - 1; idxClear >= 0; idxClear--) {
-    task = list.tasks[idxClear];
-    if (task.isComplete()) {
-        console.log(task.name);
-        switch (tagToClear) {
-            case 'today': clearToday(task);
-            case 'thisweek': clearThisWeek(task);
-        }
-        list.removeTask(task);
-    } // only clear the completed tasks
-  }  
+  else {
+    task.resetTags = ['today'];
+    task.setTags = [];
+  }
+	updateTask(task);
 }
 
-function setToday(task) {
-	if (!task.isToday()) {
-		task.setToday(true);
-		planDay.insertTask(task);
-		task.setTags = ['today'];
-		updateTask(task);
-	}
-}
-
-function resetToday(task) {
-	if (task.isToday()) {
-		task.setToday(false);
-		planDay.removeTask(task);
-		task.resetTags = ['today'];
-		task.setTags = [];
-		updateTask(task);
-	}
-}
-
-function startStop(task) {
-    if (task.isInProgress()) {
-        task.markNotStarted();
-    }
-    else if (task.isNotStarted()) {
-        task.markInProgress();
-    }
-    else {
-        return;
-    }
-    moveTask(task);
-}
 
 
 /*
 =========================================================================
- Today View - Loading into Various Lists
+ Today View - Loading into The One List
 -------------------------------------------------------------------------
- These two functions make sure various lists that make up the today
- view are populated properly from the server, with each list presumably
- bound to the UI.  It distributes the items into lists based on their
- status and existence of a time (it puts timed items into a calendar).
- One function kicks off the server call and the other is called back
- for each task returned by the server.
+ This function calls the server to get all the "today" view tasks, and
+ provides as its callback the todayTasks() function which is called for
+ each task and drops it into the single todaylist which is used for the
+ entire page.  This used to drop into separate lists for each UI
+ component, but we made the components smart enough to pick their own
+ subsets from the larger list.
 
  Structure:
   * loadTasksToday() - kicks off ajax call for all 'today' tasks
-  * todayTaskIntoLists() - figures where to put each task
+  * todayTasks()     - puts it into the list
 ========================================================================*/
-function todayTaskIntoLists(task) {
-  if (task.isComplete()) {
-    done.insertTask(task, 'actualendtime');
-  }
-  else if (task.isInProgress()) {
-    inprogress.insertTask(task);
-  }
-  else {
-    if (task.getTargetStartTime() == null) {
-      stuff.insertTask(task);
-    }
-    else {
-      scheduled.insertTask(task, 'targetstarttime');
-    }
-  }
+function todayTasks(eachTask) {
+  todaylist.insertTask(eachTask)
 }
 function loadTasksToday(tags = null) {
-  collectTasks(tasksTodayURL(tags), todayTaskIntoLists)
+  collectTasks(tasksTodayURL(tags), todayTasks)
 }
 
 
@@ -584,6 +326,17 @@ function loadTasksToday(tags = null) {
 =========================================================================
  Planning View - Loading the Week and Day Lists
 -------------------------------------------------------------------------
+ We're in the process of converting this code into smarter UI components
+ that select the tasks they care about by looking at the state and
+ tags.  Right now, we will LOSE the functionality to include a task in
+ one of our UI lists based on their date - we'll only look at the
+ explicit tags set on them.  We could:
+  - fake the thisweek or today tags based on the dates for the UI
+  - enhance the UI controls to "match" on dates as well as tags
+
+ Still, it works pretty well just with the tags at the moment.  Note that
+ the UI will not show everything the server returns because of this.
+
  These two sets of functions load the "thisweek" and "today" lists
  so they can be displayed side-by-side (will later be augmented with
  thismonth and thisyear and foreever lists???).  They mostly rely on
@@ -598,16 +351,17 @@ function loadTasksToday(tags = null) {
   * planTaskIntoDay() - added task to day list
 
  TBD - Funny use of a global to track where to put things in the week
-       view so completed weekly items auto-populate ar the bottom of the
-       list.
+       view so completed weekly items auto-populate at the bottom of the
+       list.  This functionality may not be working well with the new
+       UI components so may need to be fixed.
 ========================================================================*/
 var planningIdLastIncomplete = null;
 function planTaskIntoWeek(task) {
   if (task.isComplete()) {
-    planWeek.insertTask(task, 'end');
+    planninglist.insertTask(task, 'end');
   }
   else {
-    planWeek.insertTask(task, planningIdLastIncomplete!=null?planningIdLastIncomplete:'start');
+    planninglist.insertTask(task, planningIdLastIncomplete!=null?planningIdLastIncomplete:'start');
     planningIdLastIncomplete = task.id;
   } 
 }
@@ -617,7 +371,7 @@ function loadTasksThisWeek(tags = null) {
 }
 
 function planTaskIntoDay(task) {
-  planDay.insertTask(task)
+  planninglist.insertTask(task)
 }
 function loadTasksThisDay(tags = null) {
   collectTasks(tasksTodayURL(tags), planTaskIntoDay)
@@ -731,6 +485,7 @@ function findAllCompletedTaskDates() {
  the UI doesn't actually need them).
 ========================================================================*/
 function tagsDoneFinding(mapTags) {
+
   // these system tags shouldn't be displayed to the user
   delete mapTags.today  
   delete mapTags.thisweek
@@ -746,4 +501,3 @@ function tagsDoneFinding(mapTags) {
 function tagsFindAll() {
   collectTags(tagsDoneFinding)
 }
-
