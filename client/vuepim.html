@@ -4,13 +4,23 @@
 <meta charset="utf-8"> 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- Trying Bootstrap 4 - move into correct place later -->
+
+<!-- LOCAL VERSIONS 4.4.1 -->
+<link rel="stylesheet" href="bootstrap/4.4.1/css/bootstrap.min.css">
+<script src="jquery/3.4.1/jquery-3.4.1.slim.min.js"></script>
+<script src="popper/1.16.0/popper.min.js"></script>
+<script src="bootstrap/4.4.1/js/bootstrap.min.js"></script>  
+<script src="fontawesome/041d5ecc63.js"></script> 
+<!-- -->
+
+<!-- Trying Bootstrap 4 - move into correct place later
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
 <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
-
 <script src="https://use.fontawesome.com/041d5ecc63.js"></script>
+-->
+
 
 <!-- LOCAL VERSIONS 3.3.7 
 <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap.min.css">
@@ -53,34 +63,32 @@
 
   <div class="container-fluid">
 
-    <div class="row ml-0 mr-0 mb-0 p-0">
+    <div class="row ml-1 mr-1 mb-0 p-0">
       <pim-title-bar title="Today" :tags="allTags" :selected="selectedTags" :add="true" @modal="modal({task:null,list:all,tags:['today']})" />
     </div>
 
+    <div class="row ml-0 mr-0 p-0">
 
-    <div class="row">
+      <pim-column slot-name="left" :columns="columns" :show="visLists[0]" >
+        <pim-task-list :task-list="all" :title="titleLists[0]" time :state="0" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
+      </pim-column>
 
-      <div class="col-sm-4 pl-3 pr-1">
-        <pim-task-list :task-list="all" title="Calendar" time :state="0" @modal="modal" :tags="selectedTags" systag="today" />
-      </div>
+      <pim-column slot-name="center" :columns="columns" :show="visLists[1]" >
+        <pim-task-list :task-list="all" :title="titleLists[1]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
+      </pim-column>
 
-
-      <div class="col-sm-4 pl-1 pr-1">
-        <pim-task-list :task-list="all" title="Stuff To Do" :time="false" :state="0" @modal="modal" :tags="selectedTags" systag="today" />
-      </div>
-
-      <div class="col-sm-4 pl-1 pr-3">
+      <pim-column slot-name="right" :columns="columns" :show="visLists[2] || visLists[3]" > 
         <div class="row">
             <div class="col-sm-12">
-              <pim-task-list :task-list="all" title="In Progress" :state="2" @modal="modal"hidewhenempty :tags="selectedTags" systag="today" />
+              <pim-task-list :task-list="all" :title="titleLists[2]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
             </div>
         </div>
         <div class="row">
           <div class="col-sm-12">
-            <pim-task-list :task-list="all" title="Done" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" />
+            <pim-task-list :task-list="all" :title="titleLists[3]" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" :copy="true" hidewhenempty @numtasks="numtasks" />
           </div>
         </div>
-      </div>
+      </pim-column>
 
     </div>
 
@@ -120,8 +128,23 @@ v = new Vue({
     nav: mainMenu,
     warnMessage: null,
     warnShow: false,
+    columns: 3,
+    titleLists: ["Calendar", "Stuff To Do", "In Progress", "Done"],
+    visLists: [true, true, false, true]
   },
   methods: {
+    numtasks: function(args) { // adjust num columns based on which lists are visible
+      let idxChange = this.titleLists.indexOf(args.list)
+      if (idxChange >= 0) {
+        let vis = (args.count > 0)
+        this.visLists[idxChange] = vis
+        let cols = 0
+        if (this.visLists[0]) cols += 1
+        if (this.visLists[1]) cols += 1
+        if (this.visLists[2] || this.visLists[3]) cols +=1
+        this.columns = cols
+      }
+    },
     modal: function(taskInfo) {
       this.modalTask = taskInfo.task ? taskInfo.task : new Task()
       this.modalList = taskInfo.list
@@ -135,12 +158,17 @@ v = new Vue({
     },
     // we only support dropping between lists onto Done
     // for now.
-    drop: function(ev, listTitle) {
-      var from_id = ev.dataTransfer.getData("id")
+    drop: function(ev, dropinfo) {
+      var from_id = dropinfo.dragged_id
       var from = this.all.findTask(from_id)
-      if (listTitle == "Done") {
+      if (dropinfo.list_title == "Done") {
         from.markComplete()
         changeTaskState(from)
+      }
+      else if (dropinfo.list_title == "Stuff To Do") {
+        var to_id = dropinfo.on_id
+        var to = this.all.findTask(to_id)
+        moveBeforeTask(this.all, from, to)
       }
     },
     modalSave: function(args) {

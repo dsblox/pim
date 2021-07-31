@@ -4,6 +4,7 @@ import "fmt"
 import "errors"
 import "github.com/satori/go.uuid"
 import "time"
+import "net/url"
 
 
 // didn't understand error types as values before - will rework
@@ -54,19 +55,43 @@ type TaskDataMapper interface {
 	Error() error // returns nil if the mapper is in a non-error state, or an error if in an error state
 }
 
+// TaskLink: simple object to abstract a task link with optional offsets into the name
+// for possible use by some clients to hyperlink within the task name
+// IN PROGRESS 6/18/21.  next steps:
+//   - peristence for links at least in YAML
+//   - update API to support links in and out
+//   - test this from the UI
+type TaskLink struct {
+	uri        string // should be only valid URIs
+	NameOffset int 		// offset into the name to start link
+	NameLen    int    // number of characters in the name to link (if zero not in name)
+}
+
+func (link TaskLink) SetURI(newURI string) error {
+	_, err := url.ParseRequestURI("http://google.com/")
+	if err != nil {
+ 		return err
+ 	}
+ 	link.uri = newURI
+ 	return nil
+}
+
+func (link TaskLink) GetURI() string {
+	return link.uri
+}
+
+
 // Task: our central type for the whole world here - will become quite large over time
 type Task struct {
-	id string         	// unique id of the task - TBD make this pass through to mapper!!!
-	name string      	// name of the task
-	state TaskState  	// state of the task
-	TargetStartTime *time.Time  	// targeted start time of the task
-	ActualStartTime *time.Time  	// actual start time of the task
+	id string         							// unique id of the task - TBD make this pass through to mapper!!!
+	name string      								// name of the task
+	state TaskState  								// state of the task
+	TargetStartTime *time.Time  		// targeted start time of the task
+	ActualStartTime *time.Time  		// actual start time of the task
 	ActualCompletionTime *time.Time // time task is marked done
-	Estimate time.Duration  		// estimated duration of the task
-	// today bool  		// whether or not too show in today view
-	// thisWeek bool  		// whether or not to show in this-week view
-	// dontForget bool  	// whether or not show in don't-forget view
-	tags []string 		// all the things - for now today, thisweek, dontforget
+	Estimate time.Duration  				// estimated duration of the task
+	tags []string 									// all the things - for now today, thisweek, dontforget
+	links []TaskLink 								// a task can have associated links
 
 	parents []*Task      // list of parent tasks (we support many parents)
 	kids []*Task         // list of child tasks
@@ -95,10 +120,27 @@ func (list Tasks) FindById(id string) *Task {
 	return nil
 }
 
+// Find all tasks in the list with completion times between the specified timestamps
+func (list Tasks) FindBetweenCompletionDate(dateStart time.Time, dateEnd time.Time) Tasks {
+	var result Tasks
+
+	for _, curr := range list {
+		done := curr.GetActualCompletionTime()
+		if done != nil {
+			if done.After(dateStart) && done.Before(dateEnd) {
+				result = append(result, curr)
+			}
+		}
+	}
+	return result
+}
+
+
 // Find all tasks in the list that have the specified completion date (ignore time)
 func (list Tasks) FindByCompletionDate(date time.Time) Tasks {
 	var result Tasks
 	dayToFind := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	fmt.Printf("date.Location = <%v>\n", date.Location())
 
 	for _, curr := range list {
 		done := curr.GetActualCompletionTime()
@@ -467,6 +509,58 @@ func (t *Task) GetTags() []string {
 	return result
 }
 
+// note we don't stop you from adding the same link more than once
+// I think that is ok and what we want in case you want to link the
+// same link to more than one place in the name of the task
+// provide zero for the offset and len to indicate no linking to the name
+// TBD: make sure overlapping links are never created???
+func (t *Task) AddLink(add string, offset int, len int) error {
+	tl := new(TaskLink)
+	err := tl.SetURI(add)
+	if (err != nil) {
+		return err
+	}
+	tl.NameOffset = offset
+	tl.NameLen = len
+	t.links = append(t.links, *tl)
+	return nil
+}
+
+// TBD: make this return an error
+// note the string offset and len must all match to remove
+func (t *Task) RemoveLink(remove string, offset int, len int) {
+	i := t.FindLinkIndex(remove, offset, len)
+	if i >= 0 {
+		t.links = append(t.links[:i], t.links[i+1:]...)		
+	}
+}
+
+func (t *Task) FindLinkIndex(find string, offset int, len int) int {
+	for i, l := range t.links {
+		if l.GetURI() == find && l.NameOffset == offset && l.NameLen == len {
+			return i
+		}
+	}
+	return -1
+}
+
+// for now let's just link the whole name so we can test.
+// eventually this function needs to link all links to their
+// offsets - though even further out we may not support
+// this and just force each client to link in it's own way
+func (t *Task) GetLinkedName() string {
+	if len(t.links) > 0 {
+		result := "<a href=\""
+		result += t.links[0].GetURI()
+		result += "\">"
+		result += t.GetName()
+		result += "</a>"
+		return result
+	}
+	return t.GetName()
+}
+
+
 /*
 ==================================================================================
  About Weekly Tasks
@@ -558,6 +652,20 @@ func findTaskInSlice(s []*Task, f *Task) int {
 		}
 	}
 	return -1
+}
+
+// insertTaskInSlice: worker function to put a task into a list
+// note: not part of the Task object
+func insertTaskInSlice(s []*Task, task *Task, i int) []*Task {
+	if i < 0 || i > len(s) {
+		return nil
+	}
+	if len(s) == i { // nil or empty slice or after last element
+		return append(s, task)
+   }
+   s = append(s[:i+1], s[i:]...)
+   s[i] = task
+   return s
 }
 
 // findChild: returns index of where the task provided lives in the child list
@@ -874,6 +982,30 @@ func (t *Task) Remove(newParent *Task) error {
 			k.AddParent(newParent)
 		}
 	}
+	return nil
+}
+
+// move before the specified task, or at the end if no target provided
+func (t *Task) MoveBefore(list Tasks, target *Task) error {
+
+	// make sure both tasks are in the same list to start with
+	indexTask := findTaskInSlice(list, t)
+	if indexTask == -1 {
+		return errors.New("pim-move: task is not in list")	
+	}
+
+	// if specified, make sure target is in the same list
+	var indexTarget = len(list)
+	if target != nil {
+		indexTarget = findTaskInSlice(list, target)
+		if indexTarget == -1 {
+			return errors.New("pim-move: target task is not in list")	
+		}
+	}
+
+	// move me before sibling or to the end of the list
+	removeTaskFromSlice(list, indexTask)
+	insertTaskInSlice(list, t, indexTarget)
 	return nil
 }
 

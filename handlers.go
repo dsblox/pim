@@ -227,6 +227,7 @@ func TaskShow(w http.ResponseWriter, r *http.Request) {
 func TaskFind(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
     strDate := vars["date"]
+    fmt.Printf("strDate=<%v>\n",strDate)
     date, _ := time.Parse("2006-01-02", strDate)
     if !date.IsZero() {
         if master.HasChildren() {
@@ -249,6 +250,21 @@ func TaskFind(w http.ResponseWriter, r *http.Request) {
         e.AppendMessage(fmt.Sprintf("date '%s' provided could not be parsed.  YYYY-MM-DD format required.", strDate))
         errorResponse(w, e)        
     }
+}
+
+// in development: general find function that can take lots of
+// parameters - was going to start with a date range for completion
+// dates to fix the problem with timezones only from UTC (change
+// the client to ask for local time range and call this).
+func TaskGeneralFind(w http.ResponseWriter, r *http.Request) {
+    // tbd
+    // FindBetweenCompletionDate()
+    // extract the search criteria from the request
+    vars := mux.Vars(r)
+    taskId := vars["fromDate"]
+    targetId := vars["toDate"]
+    fmt.Printf("TaskGeneralFind() fromDate: %s toDate: %s vars: %v\n", taskId, targetId, vars)
+    errorResponse(w, pimErr(emptyList)) // for now until we have a response
 }
 
 // TBD: combined with TaskFind
@@ -482,6 +498,50 @@ func TaskFindComplete(w http.ResponseWriter, r *http.Request) {
         }
     } else {
         errorResponse(w, pimErr(emptyList))
+    }
+}
+
+// consider: should this be an PUT or POST on the task itself
+// with a new "field" of "relativeImportance"?
+func TaskReorder(w http.ResponseWriter, r *http.Request) {
+
+    // extract the task ids from the request
+    vars := mux.Vars(r)
+    taskId := vars["taskId"]
+    targetId := vars["targetId"]
+    fmt.Printf("TaskReorder() taskId: %s targetId: %s vars: %v\n", taskId, targetId, vars)
+
+    // make sure the task we wish to move exists
+    t := master.FindChild(taskId)
+    if t == nil {
+      errorResponse(w, pimErr(notFound))
+      return
+    }
+
+    // make sure the task we wish to move before exists
+    // but if none specified we're moving to the end
+    target := master.FindChild(targetId)
+
+    // make the change - assumes flat list for now
+    // tbd: a better error return
+    err := t.MoveBefore(master.Kids(), target)
+    if (err != nil) {
+        errorResponse(w, pimErr(notFound))
+        return
+    }
+
+    // save the tasks impacted - ordering may have to
+    // resave the entire order each time???
+    t.Save(false)
+    // target.Save(false)
+
+    // set the successful response to indicate it worked
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.WriteHeader(http.StatusOK)
+    var j TaskJSON
+    j.FromTask(t)    
+    if err := json.NewEncoder(w).Encode(j); err != nil {
+        panic(err)
     }
 }
 

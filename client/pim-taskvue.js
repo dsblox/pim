@@ -14,6 +14,46 @@
 
 /*
 ======================================================================
+ pim-option-menu
+----------------------------------------------------------------------
+ Inputs: options  - list of options as text strings
+ Events: selected - lets parent know when an option has been chosen
+         
+ Standard display of an option menu, which communicates the selected
+ option by text string.  (May want to consider indexes for event
+ instead of text strings for easier internationalizatin?)
+====================================================================*/
+Vue.component('pim-option-menu', {
+  props: ['options'],
+  data: function() {
+    return {
+      showmenu: false,
+    }
+  },
+  template: ' \
+    <div style="display: inline"> \
+      <span @click="clicked">...</span> \
+      <div style="float: left" v-show="showmenu"> \
+        <a v-for="option in options" :key="option" @click="selected"> \
+          {{ option }} \
+        </a> \
+      </div> \
+    </div>',
+  methods: {
+    clicked: function() {
+      this.showmenu = !this.showmenu
+    },
+    selected: function(event) {
+      this.showmenu = false
+      this.$emit('selected', event.target.innerText)
+    },
+  },
+
+})
+
+
+/*
+======================================================================
  pim-start-time
 ----------------------------------------------------------------------
  Inputs: task    - the task whose start time we should display
@@ -318,7 +358,8 @@ Vue.component('pim-task', {
  Inputs: taskList      - tasks from which I should choose a subset
          title         - title of my list
          hidewhenempty - when true, hide my container when no tasks
-         clear         - include icon to "clear" a tag from this list
+         clear         - include option (in menu) to "clear" a tag from list
+         copy          - include option (in menu) to copy to clipboard
          add           - include icon to add a new task to this list
          week          - only show tasks that have "thisweek" tag
          day           - only show tasks that have "today" tag
@@ -357,6 +398,10 @@ Vue.component('pim-task-list', {
     clear: {
       default: null,
       type: String
+    },
+    copy: {
+      default: false,
+      type: Boolean
     },
     add: {
       default: false,
@@ -400,31 +445,35 @@ Vue.component('pim-task-list', {
     // i've been requested to clear a tag from all entries visible
     // usually to clear the systag like "today" or "this week"
     cleartag: function() {
-      clearTagFromList(this.matchingtasks, this.clear, true);
+      clearTagFromList(this.matchingtasks, this.clear, true)
     },
     drag: function(ev) {
       this.$emit('drag', ev, this.title)
     },
     drop: function(ev) {
-      // if dropped within the same list for reordering
-      // we should handle it here and only emit the
-      // even if we are dragging across lists.
+      // always let our parent decide what to do, but extract
+      // the ids of the tasks we care about so the parent can act
+      console.log("task-list drop")
+      var on_id = -1
       var dragged_id = ev.dataTransfer.getData("id")
       var dragged = this.matchingtasks.findTask(dragged_id);
       if (dragged != null) {
         // get the id of the item dropped onto
-        var on_id = ev.target.id;
+        on_id = ev.target.id;
         var on = this.matchingtasks.findTask(on_id)
-
-        // reorder here somehow within my own list
-        // now that I have all the info I need
-        // we need to rework the keys for these lists
-        // so vue will reorder them for us.  read up
-        // on this in v-for documentation.
-        console.log('in the same list - we will reorder')
+        if (!on) {
+          on_id = -1
+        }
       }
-      else {
-        this.$emit('drop', ev, this.title)
+      this.$emit('drop', ev, {list_title: this.title, dragged_id: dragged_id, on_id: on_id})
+    },
+    menupick: function(menuitem) {
+      menuitem = menuitem.trim()
+      if (menuitem == 'Copy') {
+        this.matchingtasks.clipboardCopy()
+      }
+      else if (menuitem == 'Archive') {
+        this.cleartag()
       }
     },
   },
@@ -449,14 +498,29 @@ Vue.component('pim-task-list', {
         return filtered.sort((a,b) => (a.getActualCompletionTime() > b.getActualCompletionTime())?1:-1)
       }
       return filtered // sort in natural order
+    },
+    menuoptions: function() {
+      let options = []
+      if (this.copy && this.matchingtasks.numTasks()) {
+        options.push('Copy')
+      }
+      if (this.clear && this.matchingtasks.numTasks()) {
+        options.push('Archive')
+      }
+      return options
+    },
+    numtasks: function() {
+      var newTasks = this.matchingtasks.numTasks()
+      this.$emit('numtasks', {list: this.title, count: newTasks})
+      return newTasks
     }
   },
-  template: '<div v-if="this.matchingtasks.numTasks() || !hidewhenempty" class="card mt-2"> \
+  template: '<div v-if="this.numtasks || !hidewhenempty" class="card mt-2"> \
               <div class="card-header text-white bg-primary d-flex justify-content-between align-items-baseline pt-1 pb-0 pl-2 pr-2"> \
                 <h6>{{title}} <pim-add v-if="this.add" @newtask="newtask"/></h6>\
                 <div class=""> \
+                  <pim-option-menu v-if="menuoptions.length" :options="menuoptions" @selected="menupick" /> \
                   <pim-duration :duration="this.matchingtasks.durationFormatted()" /> \
-                  <pim-clear v-if="this.clear" @clear="cleartag" /> \
                 </div> \
               </div> \
               <div class="card-body list-group list-group-flush p-1"> \
@@ -820,3 +884,90 @@ Vue.component('pim-selector-date', {
             </div>'
 })
 
+/*
+======================================================================
+ pim-column
+----------------------------------------------------------------------
+ Inputs: padLeft  - padding so the divs will line up when class is set
+         padRight - padding so the divs will line up when class is set
+         columns  - bound to integer telling num cols, so we can set width
+         show     - bound to boolean to show/hide this column
+
+ This component will dynamically adjust the visibility and width of
+ columns based on whether the task-lists within them are empty or
+ not.  It works by letting the parent tell it how many columns are
+ on the page, and letting the parent tell it whether or not to keep
+ it visible.
+
+ Note that the dynamic padLeft and padRight are no longer used:
+ instead we always pad 1 and added some margin to the enclosing row
+ which makes more sense.  But left the code here in case future uses
+ of pim-column want to dynamically set the padding.
+
+ UPDATE: I did all this work to dynamically calculate the width, 
+ then realized I could just specify "col" to bootstrap and it would
+ dynamically size the columns.  So the only purpose of the pim-column
+ is to dynamically show/hide, and the "col" class will handle the
+ sizing.  I suspect there will also be a way to remove the padding
+ calculations as well and simplify this whole component and let
+ bootstrap do most of the work.  TBD.
+====================================================================*/
+Vue.component('pim-column', {
+  props: {
+    padLeft:    { type: Number,  default: 1 },
+    padRight:   { type: Number,  default: 1 },
+    columns:    { type: Number,  default: 3 },
+    show:       { type: Boolean, default: true },
+    left:       { type: Number,  default: 0 },
+    right:      { type: Number,  default: 2 }, 
+  },
+  computed: {
+    width: function() { // set bootstrap col width based on number of visible columns
+      return (this.columns >=1 && this.columns <= 3)?(12 / this.columns):4
+    },
+    vis: function () { return this.show },    
+    columnClass: function () {
+      let pl = this.padLeft
+      let pr = this.padRight
+      if (this.vis && this.columns == 1) {
+        pl = 1
+        pr = 1
+      }
+      // return 'col-sm-' + this.width + ' pl-' + pl + ' pr-' + pr;
+      return 'col' + ' pl-' + pl + ' pr-' + pr;
+    }, 
+  },
+  template: '<div v-show="this.vis" :class="columnClass"> \
+                <slot></slot> \
+              </div>'
+})
+
+Vue.component('pim-column-old', {
+  props: {
+    padLeft:    { type: Number,  default: 1 },
+    padRight:   { type: Number,  default: 1 },
+    columns:    { type: Number,  default: 3 },
+    show:       { type: Boolean, default: true },
+    left:       { type: Number,  default: 0 },
+    right:      { type: Number,  default: 2 }, 
+  },
+  computed: {
+    width: function() { // set bootstrap col width based on number of visible columns
+      return (this.columns >=1 && this.columns <= 3)?(12 / this.columns):4
+    },
+    vis: function () { return this.show },    
+    columnClass: function () {
+      let pl = this.padLeft
+      let pr = this.padRight
+      if (this.vis && this.columns == 1) {
+        pl = 1
+        pr = 1
+      }
+      // return 'col-sm-' + this.width + ' pl-' + pl + ' pr-' + pr;
+      return 'col' + ' pl-' + pl + ' pr-' + pr;
+    }, 
+  },
+  template: '<div v-show="this.vis" :class="columnClass"> \
+                <slot></slot> \
+              </div>'
+})

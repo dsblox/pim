@@ -35,7 +35,7 @@ type PimErrors []PimError
 
 
 var pimErrors = PimErrors {
-	PimError{ Code:success,    Msg:"pim: success",                    Response:http.StatusOK},
+	 PimError{ Code:success,    Msg:"pim: success",                    Response:http.StatusOK},
     PimError{ Code:notFound,   Msg:"pim: requested taskid not found", Response:http.StatusNotFound},
     PimError{ Code:emptyList,  Msg:"pim: empty task list",            Response:http.StatusNotFound},
     PimError{ Code:badRequest, Msg:"pim: could not process request",  Response:http.StatusUnprocessableEntity},

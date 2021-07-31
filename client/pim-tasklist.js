@@ -39,6 +39,18 @@ class TaskList {
     return newlist    
   }
 
+  find(callback, thisarg) {
+    return this.tasks.find(callback, thisarg)
+  }
+
+  findIndex(callback, thisarg) {
+    return this.tasks.findIndex(callback, thisarg)
+  }
+
+  findTaskIndex(task) {
+    return this.findIndex(t => t.getId() === task.getId())
+  }
+
   // add a task and keep in time order unless requested not to
   insertTask(task, placement = 'end') {
 
@@ -184,6 +196,29 @@ class TaskList {
     }
     else {
       return null;
+    }
+  }
+
+  getAsText() {
+    let strings = this.tasks.map(t => t.getAsText())
+    return strings.join('\n')
+  }
+
+  getAsHTML() {
+    let strings = this.tasks.map(t => '<li>' + t.getAsHTML())
+    return "<ul>" + strings.join('') + "</ul>"
+  }  
+
+  async clipboardCopy() {
+    try {
+      const textType = 'text/plain'
+      const textBlob = new Blob([this.getAsText()], { type: textType })
+      const htmlType = 'text/html'
+      const htmlBlob = new Blob([this.getAsHTML()], { type: htmlType })
+      let data = [new ClipboardItem({ [htmlType]: htmlBlob, [textType]: textBlob })]
+      await navigator.clipboard.write(data)
+    } catch (err) {
+      console.log('clipboardCopy: copy failed with ' + err)
     }
   }
 

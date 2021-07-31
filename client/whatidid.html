@@ -4,13 +4,21 @@
 <meta charset="utf-8"> 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- Trying Bootstrap 4 - move into correct place later -->
+<!-- LOCAL VERSIONS 4.4.1 -->
+<link rel="stylesheet" href="bootstrap/4.4.1/css/bootstrap.min.css">
+<script src="jquery/3.4.1/jquery-3.4.1.slim.min.js"></script>
+<script src="popper/1.16.0/popper.min.js"></script>
+<script src="bootstrap/4.4.1/js/bootstrap.min.js"></script>  
+<script src="fontawesome/041d5ecc63.js"></script> 
+<!-- -->
+
+<!-- Trying Bootstrap 4 - move into correct place later
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
 <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
-
 <script src="https://use.fontawesome.com/041d5ecc63.js"></script>
+-->
 
 <!-- LOCAL VERSIONS 3.3.7 
 <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap.min.css">
@@ -62,11 +70,11 @@
 
     <div class="row">
 
-      <div class="col-sm-4">
+      <div class="pl-3 pr-2 width:300px">
         <pim-selector-date :available-dates="completedTaskDates" v-model="selectedDate" v-on:input="myDateChanged($event)"/> 
       </div>
 
-      <div class="col-sm-8">
+      <div class="col pl-1">
         <pim-task-list :task-list="currday" title="Done" @modal="modal" :tags="selectedTags" :state="1" />
       </div>
 
@@ -134,6 +142,8 @@ v = new Vue({
   },
   methods: {
     modal: function(taskInfo) {
+      // the modal component is bound to this.modalTask, so when we 
+      // set modalTask to something new it knows to show itself
       this.modalTask = taskInfo.task ? taskInfo.task : new Task()
       this.modalList = taskInfo.list;
       this.modalTags = taskInfo.tags;

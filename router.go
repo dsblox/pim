@@ -12,29 +12,23 @@ func NewRouter(files string) *mux.Router {
         handler = route.HandlerFunc
         handler = Logger(handler, route.Name)
 
-        // a little hacky - but for all GETs add a second
-        // route with our supported query parameters
-        // this may be further restricted to "tasks" in
-        // the future.  This is because Gorilla mux does
-        // seem to allow for optional query paramters.
-        // NOTE: have to register with the parameters FIRST
-        // otherwise it will match the one without it first.
-        // NOTE: This hack may not work when we want multiple
-        // query parameters - may nee to find a way to allow
-        // Gorilla to accept optional query parameters OR we'll
-        // have to parse the query parameters ourselves in the
-        // handlers.
-        if route.Method == "GET" {
+        // we make query parameters optional by registering the route 2x
+        // once with the query parameters and once without, and the one
+        // with the parameters has to come first. (only for GETs for now?)
+        // Gorilla mux doesn't seem to support "optional" query params so
+        // we must register 2x, and ALL params specified MUST be on the URL
+        // or order to match the route
+        if route.Method == "GET" && route.Queries != nil {
             router.
                 Methods(route.Method).
                 Path(route.Pattern).
-                Queries("tags", "{tags}").
+                Queries(route.Queries...).
                 Name(route.Name).
                 Handler(handler)
         }
 
-        // still be sure to register without in case
-        // the caller leaves of the query string
+        // still be sure to register without queiries in case
+        // the caller leaves off the query string
         router.
             Methods(route.Method).
             Path(route.Pattern).

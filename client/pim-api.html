@@ -28,6 +28,7 @@
   
         <button type="button" class="btn btn-primary" onclick="apiLoadTasks()">List Tasks</button>
         <button type="button" class="btn btn-primary" onclick="apiLoadTags()">List Tags</button>
+        <button type="button" class="btn btn-primary" onclick="apiFindDates()">Search</button>
         <div id="list">
         </div>
         </div>
@@ -125,6 +126,11 @@ function ajaxPayload(xmlhttp, url, payload, directive) {
   xmlhttp.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
   xmlhttp.send(json);
 }
+
+function pimShowError(message) {
+  alert(message)
+}
+
 
 /*
 ------------------------------------------------------------------------------
@@ -243,7 +249,7 @@ function taskItemHTML(task) {
 
 function taskListHTML(tasks) {
   html = "<ul>";
-  for (i = 0; i < tasks.numTasks(); i++) {
+  for (i = 0; tasks && i < tasks.numTasks(); i++) {
         html += taskItemHTML(tasks.getTaskByIndex(i));
   }
   html += "</ul>";
@@ -281,6 +287,23 @@ function apiTagsDone(mapTags) {
 function apiLoadTags() {
   console.log("pim-api: apiLoadTags()")
   collectTags(apiTagsDone)
+}
+
+function apiFindDates() {
+  console.log("pim-api: apiFindDates()")
+
+  // collect any filtering we want to do - for now just date
+  var strFromDate = document.getElementById("list.date").value;
+  if (strFromDate.length == 0) {
+    strFromDate = null;
+  }
+
+  strToDate = "2021-07-23"
+
+  // hard code today
+  console.log("date=<" + strFromDate + ">")
+
+  collectTasks(tasksFindDateURL(strFromDate, strToDate), null, apiListDone)  
 }
 
 /*

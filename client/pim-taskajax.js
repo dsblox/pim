@@ -146,8 +146,35 @@ function tasksFindURL(date, tags = null) {
   return makeURL(rest, tags)
 }
 
+function tasksFindDateURL(fromDate, toDate, tags = null) {
+  var rest = "tasks/find?"
+  rest += "fromDate=" + fromDate
+  rest += "&toDate=" + toDate
+  return makeURL(rest, tags) // TBD - this won't work - makeURL needs to add tags without ? every time
+}
+
+function tasksReorderURL(moveId, beforeId) {
+  console.log(beforeId)
+  return makeURL("reorder/" + moveId + "?targetId=" + beforeId)  
+}
+
 function tagsURL() {
   return makeURL("tags")
+}
+
+function reorderTask(move, before) {
+  ajax = ajaxObj()
+  ajax.onreadystatechange = function() {  
+    if (this.readyState == 4) {
+      if (this.status == 200) {
+        console.log("success: reorder succeeded")
+      }
+      else {
+        console.log("failed: reorder failed http response: " + this.status)
+      }
+    }
+  }
+  ajaxGet(ajax, tasksReorderURL(move.getId(), before.getId()))
 }
 
 /*

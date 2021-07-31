@@ -44,6 +44,16 @@ function extractDateString(timestamp) {
   return strDate;  
 }
 
+// note - this still doesn't check that the date is valid
+// ie - a Date() object can be created with in invalid date ???
+function isDate(newTime) {
+  if (newTime != null && !(newTime instanceof Date)) {
+    console.log('setTargetStartTime() - caller provided non-date')
+    return false
+  } else {
+    return true
+  }
+}
 
 
 // create our basic task view model
@@ -252,7 +262,9 @@ class Task {
   }
 
   setTargetStartTime(newTime) {
-    this.targetStartTime = newTime;
+    if (isDate(newTime)) {
+      this.targetStartTime = newTime;
+    }
   }
 
   hasCompletionTime() {
@@ -264,7 +276,9 @@ class Task {
   }
 
   setActualCompletionTime(newTime) {
-    this.actualCompletionTime = newTime;
+    if (isDate(newTime)) {
+      this.actualCompletionTime = newTime;
+    }
   }
 
   // set targetStartTime from well formatted date / time strings
@@ -357,6 +371,22 @@ class Task {
   justStartDate() {
     return extractDateString(this.getTargetStartTime())
   }
+
+  getAsText() {
+    let result = this.startTimeString() + this.getName()
+    let duration = this.estimateString()
+    if (duration) {
+      result += " (" + duration + ")"
+    }
+    return result
+  }
+
+  getAsHTML() {
+    // same as text for now, but soon will have embedded links
+    // that will be different
+    return this.getAsText()
+  }
+
 
 } // class Task
 
