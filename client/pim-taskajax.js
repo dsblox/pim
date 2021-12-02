@@ -112,17 +112,25 @@ function tasksURL(id = "") {
 
 function tasksDefaultSystemTagURL(systemTag, tags = null) {
   var urlTags = [];
-  if (tags == null) {
-    urlTags.push(systemTag);
+
+  if (systemTag != null) {
+    urlTags.push(systemTag)
   }
-  else if (typeof(tags) == "string") {
-    urlTags = [systemTag, tags]
+
+  if (tags != null) {
+    if (typeof(tags) == "string") {
+      urlTags.push(tags)
+    }
+    else {
+      tags.map(function(e){urlTags.push(e)});      
+    }
   }
-  else {
-    tags.map(function(e){urlTags.push(e)});
-    urlTags.push(systemTag);
-  }
+
   return makeURL("tasks", urlTags);  
+}
+
+function tasksAllURL(tags = null) {
+  return tasksDefaultSystemTagURL(null, tags);  
 }
 
 function tasksTodayURL(tags = null) {
@@ -424,6 +432,12 @@ function loadTags(taskJSON, taskJS) {
   }
 }
 
+function loadLinks(taskJSON, taskJS) {
+  if (taskJSON.links != null && taskJSON.links.length > 0) {
+    taskJSON.links.map(function(link){taskJS.addLink(link, null, -1, -1)});
+  }
+}
+
 var nSecPerMinute = 60000000000;
 function taskJsonToJs(jsonTask) {
   t = new Task(jsonTask.id, 
@@ -435,7 +449,8 @@ function taskJsonToJs(jsonTask) {
   t.state = jsonTask.state; // see mapping in TaskState enum
   t.setTargetStartTime(stringToDate(jsonTask.targetStartTime, true));
   t.setActualCompletionTime(stringToDate(jsonTask.actualCompletionTime, true));
-  loadTags(jsonTask, t); // will set system tags like today and thisweek 
+  loadTags(jsonTask, t)
+  loadLinks(jsonTask, t)
   return t;
 }
 

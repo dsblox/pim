@@ -159,7 +159,10 @@ func initMasterTask(dbName string) *Task {
 	}
 
 	// load the task list recursively
-	masterTask.Load(true)
+	err := masterTask.Load(true)
+	if err != nil {
+		fmt.Printf("Error loading master task: %s\n", err)
+	}
 
     return masterTask
 }

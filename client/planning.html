@@ -68,15 +68,29 @@
       <pim-title-bar title="Daily Planning" :tags="allTags" :selected="selectedTags" :add="false" />
     </div>
 
-    <div class="row ml-0 mr-0">
+    <div class="row mx-0">
 
       <div class="col pl-0 pr-1">
-        <pim-task-list :task-list="all" title="Weekly Goals" :add="true" :week="true" clear="thisweek" @modal="modal" systag="thisweek" :tags="selectedTags" />
+        <div class="row mx-0">
+          <div class="col pl-0 pr-1">
+            <pim-task-list :task-list="all" title="Weekly Goals" :add="true" toggletag="today" clear="thisweek" @modal="modal" systag="thisweek" :tags="selectedTags" sort="state" />
+          </div>
+        </div>
+        <div class="row mx-0">
+          <div class="col pl-0 pr-1">
+            <pim-task-list :task-list="all" title="Don't Forget" :state="0" :add="true" :week="true" clear="dontforget" :copy="true" @modal="modal" systag="dontforget" :tags="selectedTags" toggletag="today" />
+          </div>
+        </div>
+        <div class="row mx-0">
+          <div class="col pl-0 pr-1">
+            <pim-task-list :task-list="all" title="Reuseable" :state="0" :add="true" :week="true" @modal="modal" systag="reuse" :tags="selectedTags" clone="today" />
+          </div>
+        </div>
       </div>
 
 
       <div class="col pl-1 pr-0">
-        <pim-task-list :task-list="all" title="Daily Goals" :add="true" :week="true" @modal="modal" systag="today" :tags="selectedTags" />
+        <pim-task-list :task-list="all" title="Daily Goals" :add="true" toggletag="today" @modal="modal" systag="today" :tags="selectedTags" sort="state" />
       </div>
 
     </div>
@@ -95,8 +109,9 @@
 <script>
 
 // call the server to get tasks and put into the lists
-loadTasksThisWeek();
-loadTasksThisDay();
+// loadTasksThisWeek();
+// loadTasksThisDay();
+loadPlanningTasks();
 
 // all the tags are loaded into global allTags
 tagsFindAll();

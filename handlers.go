@@ -22,8 +22,10 @@ type TaskJSON struct {
     TargetStartTime *time.Time `json:"targetStartTime,omitempty"` // targeted start time of the task
     ActualStartTime *time.Time `json:"actualStartTime,omitempty"` // actual start time of the task
     ActualCompletionTime *time.Time `json:"actualCompletionTime,omitempty"` // time task is marked done
-    Estimate time.Duration `json:"estimate"` // estimated duration of the task time.Duration
+    // Estimate time.Duration `json:"estimate"` // estimated duration of the task time.Duration
+    Estimate int `json:"estimate"`
     Tags []string `json:"tags"`              // tags to set - for non-updates - make task tags match
+    Links []string `json:"links"`             // links to set - for non-updates - make links match
     Dirty []string `json:"dirty"`            // for updates only - which fields to update
     SetTags []string `json:"setTags"`        // for updates only - which tags to set - set "wins"
     ResetTags []string `json:"resetTags"`    // for updates only - which tags to reset
@@ -49,7 +51,7 @@ func (j *TaskJSON) ToTask(t *Task, update bool) {
         t.SetState(j.State)
     }
     if !update || j.IsDirty("estimate") {
-        t.SetEstimate(j.Estimate * time.Minute)
+        t.SetEstimate(time.Duration(j.Estimate) * time.Minute)
     }
     if !update || j.IsDirty("targetstarttime") {
         t.SetTargetStartTime(j.TargetStartTime)
@@ -73,6 +75,18 @@ func (j *TaskJSON) ToTask(t *Task, update bool) {
             t.SetTag(v)
         }
     }
+    if !update || j.IsDirty("links") { // for now we always take the link(s) we're given
+        t.ClearLinks()
+        for _, v := range j.Links {
+            err := t.AddLink(v, 0, 0)
+            if err != nil {
+                // TBD: find a way to report an error back to the client of the API
+                //      for now we are failing almost silently with just the console error
+                fmt.Printf("ToTask(): failed trying to add invalid URL <%v>\n", v) 
+            }
+        }
+    } // in the future we'll support set/reset links like we do for tags perhaps
+
 }
 
 func (j *TaskJSON) FromTask(t *Task) {
@@ -83,8 +97,9 @@ func (j *TaskJSON) FromTask(t *Task) {
         j.TargetStartTime = t.GetTargetStartTime()
         j.ActualStartTime = t.GetActualStartTime()
         j.ActualCompletionTime = t.GetActualCompletionTime()
-        j.Estimate = t.GetEstimate()
+        j.Estimate = int(t.GetEstimate())
         j.Tags = t.GetAllTags()
+        j.Links = t.GetLinks()
     }
 }
 
@@ -146,7 +161,7 @@ func Index(w http.ResponseWriter, r *http.Request) {
  tag as the value.  This is to let the caller know how "popular" each tag is.
 ============================================================================*/
 func TagIndex(w http.ResponseWriter, r *http.Request) {
-    fmt.Printf("TagIndex(): entry\n")
+    // fmt.Printf("TagIndex(): entry\n")
     if master.HasChildren() {
         tags := master.Kids().GetChildTags()
         if tags != nil {
@@ -164,7 +179,7 @@ func TagIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func TaskIndex(w http.ResponseWriter, r *http.Request) {
-    fmt.Printf("TaskIndex(): made it in\n")
+    // fmt.Printf("TaskIndex(): made it in\n")
     vars := mux.Vars(r)
     strtags := vars["tags"]
     var tags []string
@@ -318,6 +333,7 @@ func taskRead(w http.ResponseWriter, r *http.Request) *TaskJSON {
     fmt.Printf("taskRead() payload received: %s\n", body)
     if err := json.Unmarshal(body, &task); err != nil {
         errorResponse(w, pimErr(badRequest))
+        fmt.Print("taskRead(): ")
         fmt.Println(err)
         return nil
     }

@@ -4,7 +4,7 @@ import "fmt"
 import "errors"
 import "github.com/satori/go.uuid"
 import "time"
-import "net/url"
+// import "net/url"
 
 
 // didn't understand error types as values before - will rework
@@ -67,16 +67,18 @@ type TaskLink struct {
 	NameLen    int    // number of characters in the name to link (if zero not in name)
 }
 
-func (link TaskLink) SetURI(newURI string) error {
+func (link *TaskLink) SetURI(newURI string) error {
+	/* TBD - represent the URI properly in go
 	_, err := url.ParseRequestURI("http://google.com/")
 	if err != nil {
  		return err
  	}
+ 	*/
  	link.uri = newURI
  	return nil
 }
 
-func (link TaskLink) GetURI() string {
+func (link *TaskLink) GetURI() string {
 	return link.uri
 }
 
@@ -167,7 +169,6 @@ func (list Tasks) GetChildTags() map[string]int {
 			tags[tag] = tags[tag] + 1;
 		}
 	}
-	fmt.Printf("GetChildTags(): got tags\n")	
 	return tags;
 }
 
@@ -285,6 +286,18 @@ func NewTaskMemoryOnly(newName string) *Task {
 func (t *Task) MapperError() error {
 	return t.persist.Error()
 }
+
+/* -- TBD - we may not need this - we can let the UI clone on its own
+func (t *Task) Clone() *Task {
+	clone = NewTask(t.GetName())
+
+	// will time points and arrays of links be copied by value?
+	clone = t
+
+	// we know parents will be maintanied by refernece which we want
+	// but TBD we probably eventually want to copy the children to new copies!
+	return clone
+} -- */
 
 func (taska *Task) Equal(taskb *Task) bool {
 	return taska.GetId() == taskb.GetId()
@@ -509,21 +522,56 @@ func (t *Task) GetTags() []string {
 	return result
 }
 
+/*
+==========================================================================
+ Links
+--------------------------------------------------------------------------
+ The goal and what we will implement first are different.  The goal is
+ to support any number of links attached to a task, where each link can
+ optionally specify a sub-string within the task name to hyperink in the
+ UI.  We would leave it up to each client to decide whether or not to 
+ use the offsets.
+
+ For now, though, our MVP for links is to support only one link per task
+ and to not bother testing or storing any multiple links or text offsets
+ into the name.  We've built the in-memory task object to store these
+ things, but our initial "save to YAML" and initial UI will only support
+ one link per task.  Not yet sure if we'll support a list of links
+ through the API.
+========================================================================*/
+
 // note we don't stop you from adding the same link more than once
 // I think that is ok and what we want in case you want to link the
 // same link to more than one place in the name of the task
 // provide zero for the offset and len to indicate no linking to the name
 // TBD: make sure overlapping links are never created???
 func (t *Task) AddLink(add string, offset int, len int) error {
+	// fmt.Printf("Task.AddLink(): setting new URL to <%v>\n", add)  	
 	tl := new(TaskLink)
 	err := tl.SetURI(add)
-	if (err != nil) {
+	if err != nil {
 		return err
 	}
+	// fmt.Printf("Task.AddLink(): URI back from task <%v>\n", tl.GetURI())  	
 	tl.NameOffset = offset
 	tl.NameLen = len
 	t.links = append(t.links, *tl)
 	return nil
+}
+
+func (t *Task) GetLinks() []string {
+	if len(t.links) > 0 {
+		// fmt.Printf("GetLinks(): links= %v\n", t.links)
+	}
+	result := make([]string, len(t.links))
+    for i, v := range t.links {
+        result[i] = v.GetURI()
+    }
+	return result
+}
+
+func (t *Task) GetTaskLinks() []TaskLink {
+	return t.links
 }
 
 // TBD: make this return an error
@@ -544,10 +592,18 @@ func (t *Task) FindLinkIndex(find string, offset int, len int) int {
 	return -1
 }
 
+func (t *Task) ClearLinks() {
+	t.links = nil
+}
+
+
+
 // for now let's just link the whole name so we can test.
 // eventually this function needs to link all links to their
 // offsets - though even further out we may not support
 // this and just force each client to link in it's own way
+// TBD: We will likely remove this and allow the client to
+// take care of displaying the link/links anyway they want.
 func (t *Task) GetLinkedName() string {
 	if len(t.links) > 0 {
 		result := "<a href=\""

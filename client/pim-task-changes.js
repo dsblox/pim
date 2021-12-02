@@ -181,6 +181,19 @@ function modalTaskSave(modalTask, list, sysTags) {
   return t;
 }
 
+function cloneTaskSwapTags(sourceTask, list, remove, add) {
+  let t = new Task()
+  t.clone(sourceTask)
+  console.log("cloneTaskSwapTags: t.id = "+t.getId())
+  t.removeTag(remove)
+  t.addTag(add)
+  createOrReplaceTask(t)
+  if (list != null) {
+    list.insertTask(t)
+  }  
+  return t
+}
+
 /*
 =========================================================================
  deleteTask() - this is now in the new April 2021 approach
@@ -305,29 +318,28 @@ function clearTagFromList(list, tagToClear, onlyCompleted) {
 
 /*
 =========================================================================
- writeToday - in April 2021 approach
+ writeTagChange - in April 2021 approach
 -------------------------------------------------------------------------
- This function is specifically for the today tag when it is turned on
+ This function is for the control that toggles a tag on
  or off on a task to write the change to the server.  Today it simply
  writes the change, but in the future it may enqueue changes and sync
  intermittently, which is why we haven't moved persistence into the 
  UI components.
 
- Input:  task that has been changed to have today on/off
- Result: the current state of the today tag is written to the server
+ Inputs: task - that has been changed to have it's tag turned on/off
+         tag  - the tag changing
+ Result: the current state of the tag is written to the server
 ========================================================================*/
-// called from vue component when "move to/from today" control clicked
-function writeToday(task) {
-  if (task.isToday()) {
-    task.setTags = ['today'];
+function writeTagChange(task, tag) {
+  if (task.isTagSet(tag)) {
+    task.setTags = [tag];
   }
   else {
-    task.resetTags = ['today'];
+    task.resetTags = [tag];
     task.setTags = [];
   }
-	updateTask(task);
+  updateTask(task);
 }
-
 
 
 /*
@@ -406,6 +418,10 @@ function planTaskIntoDay(task) {
 }
 function loadTasksThisDay(tags = null) {
   collectTasks(tasksTodayURL(tags), planTaskIntoDay)
+}
+
+function loadPlanningTasks(tags = null) {
+  collectTasks(tasksAllURL(tags), planTaskIntoDay)
 }
 
 

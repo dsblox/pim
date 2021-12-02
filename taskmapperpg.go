@@ -18,7 +18,7 @@ const (
     // the migration version is used with my homemade migration code
     // and maps to a 4-digit set of migration files for Origin, Up
     // and Down files to be run on clean DBs, to upgrade or rollback.
-    DB_MIGRATION_VERSION = 3
+    DB_MIGRATION_VERSION = 4
 )
 
 // TaskDataMapperPostgreSQL implements TaskDataMapper to persist tasks
@@ -240,10 +240,297 @@ func (tm TaskDataMapperPostgreSQL) syncSystemTags(t *Task, newTask bool) error {
 	return nil;
 }
 
+/*
+==================================================================================
+ syncTags()
+----------------------------------------------------------------------------------
+ This function takes a memory-based task and makes sure the tags on that task
+ match the database version of the task.  Since we've not implemented "dirty"
+ flags on the task to know what has changed (yet), we implement this by making DB
+ calls to compare the tag state, and then making DB calls to force them to
+ match.
 
+ Two helper functions encapsulate some database functions, one to collect the
+ tags from a task, another to collect all tags in the database.  Both of these
+ functions returns a map where the key is the tag-name and the value is the id
+ of the tag in the database.  Since the in-memory task only has strings, this
+ helps us know the tag's id to set / remove individual tags.
+
+ We may need to add some transactional control as to make sure we don't 
+ so dumb things like create the same tag more than once if this code is
+ executed in parallel.
+
+ NOTE that when we're done here we'll create similar (not identical) code to sync 
+ hyperlinks.  This will require the new task_links table coded (but never tested)
+ in migration version 0004.
+================================================================================*/
+func (tm TaskDataMapperPostgreSQL) loadTaskTags(t *Task) (map[string]int, error) {
+	taskTagsDB := make(map[string]int)
+	taskQuery := fmt.Sprintf(`SELECT tags.name, tags.id FROM tags JOIN task_tags ON task_tags.tag_id = tags.id WHERE task_tags.task_id = '%s'`, 
+									 t.GetId())
+	taskTags, err := env.db.Query(taskQuery)
+	if err != nil {
+		log.Printf("query for the task tags failed: %s\n", taskQuery)
+		return nil, err
+		// log.Fatal(err) // maybe we should not just die here
+	}
+	defer taskTags.Close()
+	for taskTags.Next() {
+		var tagName string
+		var tagId int
+		err := taskTags.Scan(&tagName, &tagId)
+		if err != nil {
+			log.Printf("tmpg.syncTags(): row scan failed\n")
+			return nil, err
+			// log.Fatal(err)
+		}
+		taskTagsDB[tagName] = tagId
+	}
+	return taskTagsDB, err
+}
+
+// tbd - cache this (on the tm?) since it will be used over and over - but keeping
+// the cache up to date as things get saved might be a pain.  If cached, this
+// can abstract it - just return the cached map of tags.
+func (tm TaskDataMapperPostgreSQL) loadAllTags() (map[string]int, error) {
+	allTags := make(map[string]int)
+	tagQuery := `SELECT tags.name, tags.id FROM tags`
+	tags, err := env.db.Query(tagQuery)
+	if err != nil {
+		log.Printf("query for the tags failed: %s\n", tagQuery)
+		return nil, err
+	}
+	defer tags.Close()
+	for tags.Next() {
+		var tagName string
+		var dbTagId int
+		err := tags.Scan(&tagName, &dbTagId)
+		if err != nil {
+			log.Printf("tmpg.syncTags(): row scan failed\n")
+			return nil, err
+		}
+		allTags[tagName] = dbTagId
+	}
+	return allTags, nil
+}
+
+func (tm TaskDataMapperPostgreSQL) syncTags(t *Task, newTask bool) error {
+
+	// LOCK NEEDED?
+
+	// collect the list of all tags in the DB (someday just the ones for this user)
+	allTags, err := tm.loadAllTags()
+	if err != nil {
+		return err
+	}
+	// log.Printf("syncTags(): allTags=%v\n", allTags)
+
+	// collect the list of tags on the DB-version of this task in a modifiable form
+	taskTagsDB, err := tm.loadTaskTags(t)
+	if err != nil {
+		return err
+	}
+	// log.Printf("syncTags(): taskTagsDB=%v\n", taskTagsDB)
+
+	//   -- note that if "newTask" is true then there is no work to do here - always empty
+	// for each tag on this in-memory task
+	taskTagsMem := t.GetTags()
+	// log.Printf("syncTags(): taskTagsMem=%v\n", taskTagsMem)	
+	for _, tagMem := range taskTagsMem {
+
+		// log.Printf("syncTags(): In loop for tag=%v\n", tagMem)
+
+		// if the tag does not already exist in the DB then add the tag and link it to the task
+		// note it would be more efficient to add all the tags at once, but the code gets ugly so
+		// for now we'll add them one at a time.
+		_, inDBAlready := allTags[tagMem]
+		if !inDBAlready {
+			// log.Printf("syncTags(): Tag <%v> is not in DB yet, adding to DB...\n", tagMem)
+
+	    	var tagId int
+	    	err := env.db.QueryRow(`INSERT INTO tags (name, system) VALUES ($1, FALSE) RETURNING id`, tagMem).Scan(&tagId)
+			if (err != nil)	{ 
+				err = errors.New(fmt.Sprintf("tdmp.syncTags(): Unable to insert tag %s: %s", tagMem, err))
+				return err
+			}
+			
+			// log.Printf("syncTags(): Tag <%v> is now in DB as id <%v>, adding to task id <%v>...\n", tagMem, tagId, t.GetId())
+	    	_, err = dbExec(env, `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)`, t.GetId(), tagId)
+			if (err != nil)	{ 
+				err = errors.New(fmt.Sprintf("tdmp.syncTags(): Unable to insert tag linkage %s to %s: %s", tagMem, t.GetName(), err))
+				return err
+			}
+
+		} else {
+
+			// log.Printf("syncTags(): Tag <%v> is in the DB...\n", tagMem)
+
+			// else if the tag does already exist in the DB then
+			// if the tag is not already on the DB-version of the task then
+			tagId, setAlready := taskTagsDB[tagMem]
+			if !setAlready {
+				// log.Printf("syncTags(): Tag <%v> is in the DB but not on the task so assigning...\n", tagMem)
+
+				// link the tag to the task
+				tagId = allTags[tagMem]
+		    	_, err := dbExec(env, `INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)`, t.GetId(), tagId)
+				if (err != nil)	{ 
+					err = errors.New(fmt.Sprintf("tdmp.syncTags(): Unable to insert tag linkage %s to %s: %s", tagMem, t.GetName(), err))
+					return err
+				}
+			}
+
+			// this tag is handled, remove it here so later we know only remaining ones
+			// need to be unlinked from the task in the DB
+			delete(taskTagsDB, tagMem)
+		}
+
+	}
+
+	// for any "unused" remaining tags in the list of tags on the DB-version of this task
+	// log.Printf("syncTags(): taskTagsDB <%v>, len(taskTagsDB) <%v>\n", taskTagsDB, len(taskTagsDB))
+	numTagsToDelete := len(taskTagsDB)
+	if numTagsToDelete > 0 {
+		tagIdsToDelete := make([]int, numTagsToDelete)
+		i := 0
+		for _, tagId := range taskTagsDB {
+			tagIdsToDelete[i] = tagId
+			i += 1
+		}
+
+		// unlink (remove) the tags' relations to the task
+		_, err := dbExec(env, "DELETE FROM task_tags WHERE task_id = $1 AND tag_id = ANY ($2)", t.GetId(), pq.Array(tagIdsToDelete))
+		if err != nil {
+			err = errors.New(fmt.Sprintf("tdmp.syncTags(): Unable to remove tags from task %s: %s", t.GetName(), err))
+			return err
+		}
+
+	}
+
+	// UNLOCK NEEDED?
+
+	return nil
+}
+
+/*
+==================================================================================
+ syncLinks()
+----------------------------------------------------------------------------------
+ This function takes a memory-based task and makes sure the links on that task
+ match the database version of the task.  Since we've not implemented "dirty"
+ flags on the task to know what has changed (yet), we implement this by making DB
+ calls to compare the links state, and then making DB calls to force them to
+ match.
+
+ A helper function encapsulates database functions and is used at both load and
+ save time to callect the links from a task.  The function returns a map where the 
+ key is the link URI and the value is the id of the tag in the database.  This may
+ need to change to handle name offsets/lengths (see below).
+
+ TBD: We may need to add some transactional control as to make sure we don't 
+ so dumb things like create the same tag more than once if this code is
+ executed in parallel.
+
+ TBD: nameOffsets and nameLengths of tags are only partially coded so are not
+ supported.  The fields are on the in-memory objects and are in the DB, but the
+ mapper does not yet load or save them properly - only the URI is used.
+================================================================================*/
+func (tm TaskDataMapperPostgreSQL) loadTaskLinks(t *Task) (map[string]int, error) {
+	taskLinksDB := make(map[string]int)
+	taskQuery := fmt.Sprintf(`SELECT links.uri, links.nameOffset, links.nameLength, links.id FROM task_links AS links WHERE links.task_id = '%s'`, 
+									 t.GetId())
+	taskLinks, err := env.db.Query(taskQuery)
+	if err != nil {
+		log.Printf("query for the task links failed: %s (%s)\n", err, taskQuery)
+		return nil, err
+	}
+	defer taskLinks.Close()
+	for taskLinks.Next() {
+		var linkUri string
+		var linkNameOffset int
+		var linkNameLen int
+		var linkId int
+		err := taskLinks.Scan(&linkUri, &linkNameOffset, &linkNameLen, &linkId)
+		if err != nil {
+			log.Printf("tmpg.syncLinks(): row scan failed\n")
+			return nil, err
+		}
+		// TBD: use the nameOffset and nameLength
+		taskLinksDB[linkUri] = linkId
+	}
+	return taskLinksDB, err
+}
+
+func (tm TaskDataMapperPostgreSQL) syncLinks(t *Task, newTask bool) error {
+
+	// collect the list of tags on the DB-version of this task in a modifiable form
+	taskLinksDB, err := tm.loadTaskLinks(t)
+	if err != nil {
+		return err
+	}
+
+	// for each link on this in-memory task
+	taskLinksMem := t.GetTaskLinks()
+	for _, linkMem := range taskLinksMem {
+		// if the link does not already exist in the DB then add the link and link it to the task
+		// note it would be more efficient to add all the links at once, but the code gets ugly so
+		// for now we'll add them one at a time.
+		_, inDBAlready := taskLinksDB[linkMem.GetURI()]
+		if !inDBAlready {
+	    	var linkId int
+	    	err := env.db.QueryRow(`INSERT INTO task_links (uri, nameOffset, nameLength, task_id) VALUES ($1, $2, $3, $4) RETURNING id`, 
+	    	                       linkMem.GetURI(), linkMem.NameOffset, linkMem.NameLen, t.GetId()).Scan(&linkId)
+			if (err != nil)	{ 
+				err = errors.New(fmt.Sprintf("tdmp.syncLinks(): Unable to insert link %s: %s", linkMem.GetURI(), err))
+				return err
+			}
+
+		// otherwise it is there, but still check if we need to update the name / len
+		// but for now we don't update the name / len so nothing to do but remove from list
+		} else {		
+			// this link is handled, remove it here so later we know only remaining ones
+			// need to be removed
+			delete(taskLinksDB, linkMem.GetURI())
+		}
+	} // for each link on the in-memory task
+
+	// for any "unused" remaining links in the list of links on the DB-version of this task
+	// log.Printf("syncLinks(): taskLinksDB <%v>, len(taskLinksDB) <%v>\n", taskLinksDB, len(taskLinksDB))
+	numLinksToDelete := len(taskLinksDB)
+	if numLinksToDelete > 0 {
+		linkIdsToDelete := make([]int, numLinksToDelete)
+		i := 0
+		for _, linkId := range taskLinksDB {
+			linkIdsToDelete[i] = linkId
+			i += 1
+		}
+
+		// remove the links from the task
+		_, err := dbExec(env, "DELETE FROM task_links WHERE id = ANY ($1)", pq.Array(linkIdsToDelete))
+		if err != nil {
+			err = errors.New(fmt.Sprintf("tdmp.syncLinks(): Unable to remove links from task %s: %s", t.GetName(), err))
+			return err
+		}
+	}
+
+	return nil
+}
+
+/*
+==================================================================================
+ Save()
+----------------------------------------------------------------------------------
+ Inputs: t            *Task - the in-memory task to save
+ 		 saveChildren bool  - whether or not to save the child tasks
+ 		 careMyself   bool  - whether or not to save the task "t" itself (this is
+ 		                      useful if the app is using a parent task just to
+ 		                      group tasks, but doesn't want to save them)
+
+ This function writes the provided in-memory task into the PostgreSQL database.
+================================================================================*/
 func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself bool) error {
 
-	// log.Printf("Save(%t, %t): task = %s, id = %s, loaded = %t len(parentIds) = %d", saveChildren, saveMyself, t.name, t.id, tm.loaded, len(tm.parentIds))
+	log.Printf("Save(%t, %t): task = %s, id = %s, loaded = %t len(parentIds) = %d", saveChildren, saveMyself, t.name, t.id, tm.loaded, len(tm.parentIds))
 
 	// only save myself if requested
 	if saveMyself {
@@ -258,10 +545,18 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 			}
 
 			// update today, thisweek and dontforget tags - false means its an update
-			tm.syncSystemTags(t, false)
+			// tm.syncSystemTags(t, false)
+			err = tm.syncTags(t, false)
 			if (err != nil) {
 				return err;
 			}
+
+ 			// update all links - adding or removing to match the in-memory task
+			err = tm.syncLinks(t, true)
+			if (err != nil) {
+				return err;
+			}
+
 
 		} else {
 	    	_, err := dbExec(env, `INSERT INTO tasks (id, name, state, target_start_time, actual_start_time, actual_completion_time, estimate_minutes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, 
@@ -271,8 +566,14 @@ func (tm *TaskDataMapperPostgreSQL) Save(t *Task, saveChildren bool, saveMyself 
 				return err
 			}
 
-			// update today, thisweek and dontforget tags - true means its a new task
-			tm.syncSystemTags(t, true)
+			// update all tags - adding or removing to match the in-memory task
+			err = tm.syncTags(t, true)
+			if (err != nil) {
+				return err;
+			}
+
+ 			// update all links - adding or removing to match the in-memory task
+			err = tm.syncLinks(t, true)
 			if (err != nil) {
 				return err;
 			}
@@ -370,10 +671,7 @@ func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task,
 												 db_target_start_time      pq.NullTime,
 												 db_actual_start_time      pq.NullTime,
 												 db_actual_completion_time pq.NullTime,
-												 db_estimate_minutes       sql.NullInt64,
-												 db_today				   sql.NullBool,
-												 db_thisweek               sql.NullBool,
-												 db_dontforget             sql.NullBool) error {
+												 db_estimate_minutes       sql.NullInt64) error {
 	// go is terrible dealing with null values from databases
 	// must use this intervening struct to track if null or not
 	t.SetTargetStartTime(dbTimeCheck(db_target_start_time))
@@ -394,6 +692,7 @@ func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task,
 		t.SetEstimate(time.Duration(estimate_minutes) * time.Minute)
 	}
 
+/*
 	db_value_today, _ := db_today.Value()
 	if (db_value_today != nil) {
 		today := db_value_today.(bool)
@@ -411,6 +710,7 @@ func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task,
 		dontforget := db_value_dontforget.(bool)
 		t.SetDontForget(dontforget)
 	}
+*/
 
 	return nil	
 }
@@ -451,6 +751,29 @@ func (tm TaskDataMapperPostgreSQL) setTaskFields(t *Task,
      to load, then set loadChildren to false and provide a non-memory-only
      task.
 ===========================================================================*/
+func (tm TaskDataMapperPostgreSQL) loadAndSetTags(t *Task) error {
+	tagMap, err := tm.loadTaskTags(t)
+	if err != nil {
+		return err
+	}
+	for tag, _ := range tagMap {
+		t.SetTag(tag)
+	}
+	return nil
+}
+
+func (tm TaskDataMapperPostgreSQL) loadAndSetLinks(t *Task) error {
+	linkMap, err := tm.loadTaskLinks(t)
+	if err != nil {
+		return err
+	}
+	for link, _ := range linkMap {
+		t.AddLink(link, 0, 0)
+	}
+	return nil
+}
+
+
 func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) error {
 
 	var (
@@ -460,9 +783,6 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 		db_actual_start_time pq.NullTime
 		db_actual_completion_time pq.NullTime
 		db_estimate_minutes sql.NullInt64
-		db_today sql.NullBool
-		db_thisweek sql.NullBool
-		db_dontforget sql.NullBool
 	)
 
 	// if we're told this is "root" that means we should not attempt
@@ -470,15 +790,11 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 	if (!root) {
 
 		// build and execute the query for the task
-		taskQuery := `SELECT t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes, 
-		              COUNT(tt.tag_id = 1) > 0 AS today, 
-		              COUNT(tt.tag_id = 2) > 0 AS thisweek,
-		              COUNT(tt.tag_id = 3) > 0 AS dontforget
+		taskQuery := `SELECT t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes 
 		              FROM tasks t
-		              LEFT JOIN task_tags tt on tt.task_id = t.id
 		              WHERE id = '" + t.GetId() + "'" + "
 		              GROUP BY t.id`
-		err := env.db.QueryRow(taskQuery).Scan(&name, &state, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes, &db_today, &db_thisweek, &db_dontforget)
+		err := env.db.QueryRow(taskQuery).Scan(&name, &state, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes)
 		if err != nil {
 			// log.Printf("query for a task failed: %s, err: %s\n", taskQuery, err)
 			return err
@@ -487,7 +803,19 @@ func (tm TaskDataMapperPostgreSQL) Load(t *Task, loadChildren bool, root bool) e
 		// overwrite my in-memory values
 		t.SetName(name)
 		t.SetState(state)
-		tm.setTaskFields(t, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes, db_today, db_thisweek, db_dontforget)
+		tm.setTaskFields(t, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes)
+
+		// now go get and set the tags
+		err = tm.loadAndSetTags(t)
+		if err != nil {
+			return err
+		}
+
+		// now go get and set the links
+		err = tm.loadAndSetLinks(t)
+		if err != nil {
+			return err
+		}
 
 		// set myself as loaded from the DB
 		tm.loaded = true
@@ -514,18 +842,11 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 		db_actual_start_time pq.NullTime
 		db_actual_completion_time pq.NullTime
 		db_estimate_minutes sql.NullInt64
-		db_today sql.NullBool
-		db_thisweek sql.NullBool
-		db_dontforget sql.NullBool
 	)
 
-	var baseQuery string = `SELECT t.id, t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes,
-				            COUNT(tt.tag_id = 1) > 0 AS today, 
-				            COUNT(tt.tag_id = 2) > 0 AS thisweek,
-				            COUNT(tt.tag_id = 3) > 0 AS dontforget
+	var baseQuery string = `SELECT t.id, t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes
 	                        FROM tasks t
 		                    LEFT JOIN task_parents tp ON tp.child_id = t.id
-		                    LEFT JOIN task_tags tt ON tt.task_id = t.id
 		                    WHERE tp.parent_id %s
 		                    GROUP BY t.id`
 
@@ -547,7 +868,7 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 
 	// for each child task in the DB
 	for rows.Next() {
-		err := rows.Scan(&dbid, &dbname, &dbstate, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes, &db_today, &db_thisweek, &db_dontforget)
+		err := rows.Scan(&dbid, &dbname, &dbstate, &db_target_start_time, &db_actual_start_time, &db_actual_completion_time, &db_estimate_minutes)
 		if err != nil {
 			log.Printf("tmpg.loadChildren(): row scan failed\n")
 			log.Fatal(err)
@@ -556,7 +877,19 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
 
 		// create the child task
 		k := &Task{id:dbid, name:dbname, state:dbstate}
-		tm.setTaskFields(k, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes, db_today, db_thisweek, db_dontforget)
+		tm.setTaskFields(k, db_target_start_time, db_actual_start_time, db_actual_completion_time, db_estimate_minutes)
+
+		// load and set the tags
+		err = tm.loadAndSetTags(k)
+		if err != nil {
+			return err
+		}
+
+		// now go get and set the links
+		err = tm.loadAndSetLinks(k)
+		if err != nil {
+			return err
+		}
 
 		// set the data mapper onto the child indicating that it was loaded from DB
 		// TBD - this should copy the mapper from tm - shouldn't it??? I think DB_NAME will be

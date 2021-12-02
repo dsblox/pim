@@ -26,8 +26,24 @@ function ajaxSimple(xmlhttp, url, directive) {
   xmlhttp.send();
 }
 
+// the replacer is needed only to extract the URL from the
+// hyperlink because our UI has coded more functionality
+// than we can squeeze through the API so far.  So we're
+// extracting just the string from the task before adding
+// it to the payload for Hyperlinks.  All other values
+// in the task are stringified into JSON directly.
+function replacer(key, value) {
+  let retValue = value
+  if (key == 'links' && value && value.length) {
+    retValue = value.map(x => x.url);    
+  }
+  // console.log("replacer: " + key + " " + retValue)
+  return retValue
+}
+
 function ajaxPayload(xmlhttp, url, payload, directive) {
-  json = JSON.stringify(payload);
+  // console.log("payload")
+  json = JSON.stringify(payload, replacer); // replacer just for hyperlinks
   xmlhttp.open(directive, url, true);
   xmlhttp.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
   xmlhttp.send(json);

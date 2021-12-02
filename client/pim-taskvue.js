@@ -12,6 +12,68 @@
  and state of the tasks, and are grouped into the previous two for display.
 ============================================================================*/
 
+
+
+/*
+======================================================================
+ pim-task-links
+----------------------------------------------------------------------
+ Inputs: links  - list of links as Hyperlink objects
+         
+ Displays a link icon which will behave differently depending on 
+ whether there are zero, one or more links in the provided list:
+    0. the component will hide itself
+    1. the component will show label on hover, and link out on click
+   >1. the component will show a list of clickable labels on click
+
+  TBD: add hover to show label if there is a single link in it
+  TBD: allow context menu to dismiss on click anywhere off the menu
+  TBD: clean up look and feel of context menu (make into component?)
+  TBD: support collection of a label for a link and show it in menu
+====================================================================*/
+Vue.component('pim-task-links', {
+  props: ['links'],
+  data: function() {
+    return {
+      lnks: this.links,
+      showmenu: false,
+    }
+  },
+  template: ' \
+      <span v-if="show" class="fa fa-external-link fa-xs" v-on:click="clicked">\
+      <div v-if="showmenu" class="context-menu mx-0"> \
+        <ul> \
+        <li class="dropdown-item mx-0" v-for="link in lnks" :key="link.url" @click="selected"> \
+          {{ link.url }} \
+        </li> \
+        </ul> \
+      </div> \
+    </span> \
+    ',
+  methods: {
+    clicked: function() {
+      if (this.lnks.length == 1) {
+        window.open(this.links[0].url, "_blank");
+      }
+      else {
+        // show menu of links with each url
+        this.showmenu = !this.showmenu
+      }
+    },    
+    selected: function(event) {
+      this.showmenu = false
+      // TBD: when we do labels we won't be able to use innerText
+      // and we'll need to look up the url from the link object
+      window.open(event.target.innerText, "_blank");
+    },
+  },
+  computed: {
+    show: function() {
+      return (this.lnks && this.lnks.length)
+    },
+  },
+})
+
 /*
 ======================================================================
  pim-option-menu
@@ -105,13 +167,14 @@ Vue.component('pim-duration', {
 
 /*
 ======================================================================
- pim-task-settoday / pim-task-resettoday
+ pim-task-toggletag
 ----------------------------------------------------------------------
- Inputs: task - task that have it's today tag added / removed
-         
- These components either set or reset the today tag on the task
- provided using the > or < icons.  These are intended for use in 
- planning views when taking a task from a longer timeframe (for now
+ Inputs: task - task to have a tag toggled on/off
+         tag  - tag that should be toggled
+
+ This component either sets or resets any tag on the task provided
+ using the > or < icons.  These are intended for use in planning
+ views when taking a task from a longer timeframe (for now weekly
  weekly) and adding/removing from a shorter one (for now today).
 
  TBD: if we keep this component knowledgeable about its task, it
@@ -119,31 +182,65 @@ Vue.component('pim-duration', {
  have it's parent do it as it does today.  But perhaps the parent
  should really be doing ALL the work anyway.
 ====================================================================*/
-Vue.component('pim-task-settoday', {
-  props: ['task'],
-  methods: {
-    settoday: function() {
-      if (!this.task.isToday()) {
-        this.task.setToday(true);
+Vue.component('pim-task-toggletag', {
+  props: ['task', 'tag', 'clone'],
+  computed: {
+    class: function() {
+      strClass = "fa fa-chevron-"
+      if (this.task.isTagSet(this.tag)) {
+        strClass += "left"
       }
-      writeToday(this.task);
+      else {
+        strClass += "right"
+      }
+      return strClass
+    },
+  },
+  methods: {
+    toggletag: function() {
+      console.log('pim-task-toggletag: clone=<'+typeof(this.clone)+'>')
+      let bClone = (typeof(this.clone) == "string" && this.clone.length > 0)
+      if (this.task.isTagSet(this.tag)) {
+        this.task.removeTag(this.tag)
+      }
+      else {
+        if (bClone) {
+          this.task.removeTag(this.clone)
+        }
+        this.task.addTag(this.tag)
+      }
+      if (bClone) {
+        cloneTask(this.task)
+        this.task.addTag(this.clone)
+      }
+      writeTagChange(this.task, this.tag)
+
     }
   },
-  template: '<span class="fa fa-chevron-right" v-on:click="settoday"></span>'
+  template: '<span :class="this.class" v-on:click="toggletag"></span>'
 })
 
-Vue.component('pim-task-resettoday', {
+/*
+======================================================================
+ pim-task-clone
+----------------------------------------------------------------------
+ Inputs: task   - task to have a tag toggled on/off
+
+ This component simply displays the clone icon on a task and tells
+ my parent when it has been clicked by emiting a clone event.  The
+ task will pass the event on to the task list, which will have all
+ the needed context to clone the task.
+====================================================================*/
+Vue.component('pim-task-clone', {
   props: ['task'],
   methods: {
-    resettoday: function() {
-      if (this.task.isToday()) {
-        this.task.setToday(false);
-      }
-      writeToday(this.task);
+    clone: function() {
+      this.$emit('clonetask', this.task)
     }
   },
-  template: '<i class="fa fa-chevron-left" v-on:click="resettoday"></i>'
+  template: '<span class="fa fa-copy" v-on:click="clone"></span>'
 })
+
 
 /*
 ======================================================================
@@ -264,7 +361,7 @@ Vue.component('pim-tag', {
 ====================================================================*/
 Vue.component('pim-tagpicker', {
   props: ['tags', 'selected', 'tiles', 'menu', 'xicon'],
-  template: '<div> \
+  template: '<span> \
               <pim-tag v-for="tag in tags" v-bind:key="tag" \
                        :label="tag" \
                        :active="isActive(tag)" \
@@ -275,7 +372,7 @@ Vue.component('pim-tagpicker', {
               <select v-if="menu" class="form-control" v-on:change="filter"> \
                 <option v-for="tag in tags">{{ tag }}</option> \
               </select> \
-             </div>',
+             </span>',
   methods: {
     labelclick: function(tag) {
       this.$emit('tagclick', tag)
@@ -298,8 +395,11 @@ Vue.component('pim-tagpicker', {
 ======================================================================
  pim-task
 ----------------------------------------------------------------------
- Inputs: task  - my task to display
-         week  - show today/reset-today based on state of task
+ Inputs: task       - my task to display
+         toggletag  - show tag set/reset icons (chevrons) for all 
+                      tasks in the list, allowing the tag to be turned
+                      on and off
+         clone      - modify toggletag to clone the task
 
  Events: drag   - emitted when i'm being dragged
          drop   - emitted when another task has been dropped on me
@@ -311,7 +411,7 @@ Vue.component('pim-tagpicker', {
  levels annual/quarter/month/week/day planning views.
 ====================================================================*/
 Vue.component('pim-task', {
-  props: ['task', 'week'],
+  props: ['task', 'toggletag', 'clone', 'showtags'],
   methods: {
     toggle: function() {
       // tell the outside world so they can persist the change
@@ -322,6 +422,10 @@ Vue.component('pim-task', {
     },
     editme: function(task) {
       this.$emit('editme', task)
+    },
+    clonetask: function(task) {
+      console.log('pim-task.clonetask()')      
+      this.$emit('clonetask', task)
     },
     drag: function(ev, task) {
       ev.dataTransfer.dropEffect = 'move'
@@ -341,12 +445,14 @@ Vue.component('pim-task', {
                        @change="toggle"> \
                   <span class="text-dark small" v-if="task.hasStartTime()"><strong>{{starttime()}}</strong></span> \
                   <pim-task-name :task="task" @clicked="editme"></pim-task-name> \
+                  <pim-task-links v-bind:links="this.task.getLinks()" /> \
               </div> \
               <div class="p-0 d-flex justify-content-end align-items-baseline"> \
+                <pim-tagpicker v-if="this.showtags" :tags="this.task.getTags(null, [\'today\', \'thisweek\'])" /> \
                 <pim-duration :duration="task.estimateString()" /> \
                 <pim-startstop :task="task" class="pl-1" /> \
-                <pim-task-settoday :task="task" v-if="this.week && this.task.isThisWeekAndNotToday()" class="pl-1"></pim-task-settoday> \
-                <pim-task-resettoday :task="task" v-if="this.week && this.task.isThisWeekAndToday()" class="pl-1"></pim-task-resettoday> \
+                <pim-task-toggletag :task="task" v-if="this.toggletag" :tag="toggletag" class="pl-1" /> \
+                <pim-task-clone :task="task" v-if="this.clone" @clonetask="clonetask" /> \
               </div> \
             </div>'
 })
@@ -361,12 +467,13 @@ Vue.component('pim-task', {
          clear         - include option (in menu) to "clear" a tag from list
          copy          - include option (in menu) to copy to clipboard
          add           - include icon to add a new task to this list
-         week          - only show tasks that have "thisweek" tag
-         day           - only show tasks that have "today" tag
          state         - only show tasks that match the provded state
          time          - only show tasks that have a start time
          tags          - only show tasks that match ALL these tags
          systag        - only show tasks that have this systag
+         sort          - ordering, one of: for now just by state
+         toggletag     - let each task toggle the specified tag
+         clone         - let each task be cloned and add this tag (and remove systag)
 
  Events: drag   - emitted when one of our tasks if being dragged
          drop   - emitted when one of out asks has been dropped upon
@@ -407,14 +514,6 @@ Vue.component('pim-task-list', {
       default: false,
       type: Boolean
     },
-    week: {
-      default: false,
-      type: Boolean
-    },
-    day: {
-      default: false,
-      type: Boolean
-    },
     state: {  // only show tasks in this state if defined
       default: undefined,
       type: Number
@@ -430,7 +529,19 @@ Vue.component('pim-task-list', {
     systag: { // we're allowed one system tag per list
       default: null,
       type: String
-    }
+    },
+    toggletag: { // put a toggle-tag controls on each task
+      default: null,
+      type: String
+    },
+    sort: { // tell us how to sort our tasks
+      default: null,
+      type: String
+    },
+    clone: { // tell us the tag to set on the clone (and reset systag)
+      default: null,
+      type: String
+    },
   },
   methods: {
     // one of my tasks has asked to be edited so ask my parent 
@@ -446,6 +557,11 @@ Vue.component('pim-task-list', {
     // usually to clear the systag like "today" or "this week"
     cleartag: function() {
       clearTagFromList(this.matchingtasks, this.clear, true)
+    },
+    // i've been requested to clone a task, add a tag and remove systag
+    clonetask: function(task){
+      console.log("pim-task-list.clonetask()")
+      cloneTaskSwapTags(task, this.taskList, this.systag, this.clone)
     },
     drag: function(ev) {
       this.$emit('drag', ev, this.title)
@@ -487,11 +603,38 @@ Vue.component('pim-task-list', {
         return ((this.state === undefined || t.state == this.state) && 
                 (this.time === undefined || t.hasStartTime() == this.time) &&
                 (this.tags == null || t.hasAllTags(this.tags)) &&
-                (this.systag == null || t.isTagSet(this.systag)))
+                (this.systag == null || t.isSysTagSet(this.systag)))
       }, this)
 
       // sorting
-      if (this.time) {  // sort by start time
+      if (this.sort == 'state') {
+        return filtered.sort(function(a,b) {
+          let result = 0
+          aState = a.getSortState()
+          bState = b.getSortState()
+          aTime = a.getActualCompletionTime()
+          bTime = b.getActualCompletionTime()
+          if (aState !== bState) {
+            result = (aState < bState)?1:-1
+          }
+          else if (aState === 4) { // if complete sort by completion time
+            result = (a.getActualCompletionTime() > b.getActualCompletionTime())?1:-1
+          }
+          else if (aState === 1) { // if not started sort by start time if specified
+            if (b.getTargetStartTime() == null) {
+              return -1
+            }
+            else {
+              result = (a.getTargetStartTime() > b.getTargetStartTime())?1:-1
+            }
+          }
+          else {
+            result = 0
+          }
+          return result
+        })
+      }
+      else if (this.time) {  // sort by start time
         return filtered.sort((a,b) => (a.getTargetStartTime() > b.getTargetStartTime())?1:-1)
       }
       else if (this.state === TaskState.COMPLETE) { // sort by completion time
@@ -525,9 +668,12 @@ Vue.component('pim-task-list', {
               </div> \
               <div class="card-body list-group list-group-flush p-1"> \
                 <pim-task v-for="task in matchingtasks.tasks" \
-                              :key="task.id" :task="task" :week="week" :day="day" \
+                              :key="task.id" :task="task" :toggletag="toggletag" \
+                              :clone="clone" \
+                              :showtags="false" \
                               @drag="drag" @drop="drop" \
                               @editme="edittask" \
+                              @clonetask="clonetask" \
                               class="list-group-item" /> \
               </div> \
              </div>'
@@ -600,6 +746,7 @@ Vue.component('pim-modal', {
       strtime: "",
       strdate: "",
       strtags: "",
+      strlink: "",
     }
   },
   methods: {
@@ -616,7 +763,14 @@ Vue.component('pim-modal', {
     save: function() { 
       // bring the tags and date form fields together
       this.t.addTagsFromString(this.strtags) // tags combined from t and text box
-      this.t.setTargetStart(this.strdate, this.strtime)      
+      this.t.setTargetStart(this.strdate, this.strtime)
+      this.t.clearLinks() // for now always clear links until we have UI for multiple
+      if (this.strlink.length) {
+        this.t.addLink(this.strlink)      
+      }
+      if (this.t.getEstimate() <= 0) {
+        this.t.setEstimate(0)
+      }
 
       // tell my parent so it can persist and update actual tasks in the lists
       this.$emit('save', {task: this.t, list: this.list, systags: this.systags})
@@ -626,6 +780,7 @@ Vue.component('pim-modal', {
       this.strtime = ""
       this.strdate = ""
       this.strtags = "" // always clear the "add tags" box
+      this.strlink = ""
     },
     deltask: function() { // remove the task from the list and call the server
       this.list.removeTask(this.task) // we'll take care of the JS objects
@@ -636,11 +791,17 @@ Vue.component('pim-modal', {
         this.t.copy(this.task)
         this.strtime = this.t.justStartTime()
         this.strdate = this.t.justStartDate()
+        // for now get the first link only
+        let links = this.t.getLinks()
+        if (links && links.length) {
+          this.strlink = links[0].url
+        }
       }
       else {
         this.t = new Task()
         this.strtime = ""
         this.strdate = ""
+        this.strlink = ""
       }
       this.strtags = "" // always clear the "add tags" box
 
@@ -713,6 +874,14 @@ Vue.component('pim-modal', {
                             <label class="input input-group-text" for="duration">Estimate (min):</label> \
                           </div> \
                           <input type="number" class="form-control" id="duration" placeholder="Optional minutes to complete" v-model.number="t.estimate"> \
+                        </div> \
+                      </div> \
+                      <div class="form-group"> \
+                        <div class="input-group input-group mb-3"> \
+                          <div class="input-group-prepend"> \
+                            <label class="input input-group-text" for="link">Hyperlink:</label> \
+                          </div> \
+                          <input type="text" class="form-control" id="link" placeholder="Include http protocol for now" v-model.number="strlink"> \
                         </div> \
                       </div> \
                       <div><span>&nbsp;</span></div> \
@@ -888,86 +1057,20 @@ Vue.component('pim-selector-date', {
 ======================================================================
  pim-column
 ----------------------------------------------------------------------
- Inputs: padLeft  - padding so the divs will line up when class is set
-         padRight - padding so the divs will line up when class is set
-         columns  - bound to integer telling num cols, so we can set width
-         show     - bound to boolean to show/hide this column
+ Inputs: show     - bound to boolean to show/hide this column
 
- This component will dynamically adjust the visibility and width of
- columns based on whether the task-lists within them are empty or
- not.  It works by letting the parent tell it how many columns are
- on the page, and letting the parent tell it whether or not to keep
- it visible.
-
- Note that the dynamic padLeft and padRight are no longer used:
- instead we always pad 1 and added some margin to the enclosing row
- which makes more sense.  But left the code here in case future uses
- of pim-column want to dynamically set the padding.
-
- UPDATE: I did all this work to dynamically calculate the width, 
- then realized I could just specify "col" to bootstrap and it would
- dynamically size the columns.  So the only purpose of the pim-column
- is to dynamically show/hide, and the "col" class will handle the
- sizing.  I suspect there will also be a way to remove the padding
- calculations as well and simplify this whole component and let
- bootstrap do most of the work.  TBD.
+ This component will dynamically adjust the visibility  of columns
+ based on whether the task-lists within them are empty or not.  It
+ works by letting the parent tell it when it is visible.
 ====================================================================*/
 Vue.component('pim-column', {
   props: {
-    padLeft:    { type: Number,  default: 1 },
-    padRight:   { type: Number,  default: 1 },
-    columns:    { type: Number,  default: 3 },
-    show:       { type: Boolean, default: true },
-    left:       { type: Number,  default: 0 },
-    right:      { type: Number,  default: 2 }, 
+    show: { type: Boolean, default: true },
   },
   computed: {
-    width: function() { // set bootstrap col width based on number of visible columns
-      return (this.columns >=1 && this.columns <= 3)?(12 / this.columns):4
-    },
     vis: function () { return this.show },    
-    columnClass: function () {
-      let pl = this.padLeft
-      let pr = this.padRight
-      if (this.vis && this.columns == 1) {
-        pl = 1
-        pr = 1
-      }
-      // return 'col-sm-' + this.width + ' pl-' + pl + ' pr-' + pr;
-      return 'col' + ' pl-' + pl + ' pr-' + pr;
-    }, 
   },
-  template: '<div v-show="this.vis" :class="columnClass"> \
-                <slot></slot> \
-              </div>'
-})
-
-Vue.component('pim-column-old', {
-  props: {
-    padLeft:    { type: Number,  default: 1 },
-    padRight:   { type: Number,  default: 1 },
-    columns:    { type: Number,  default: 3 },
-    show:       { type: Boolean, default: true },
-    left:       { type: Number,  default: 0 },
-    right:      { type: Number,  default: 2 }, 
-  },
-  computed: {
-    width: function() { // set bootstrap col width based on number of visible columns
-      return (this.columns >=1 && this.columns <= 3)?(12 / this.columns):4
-    },
-    vis: function () { return this.show },    
-    columnClass: function () {
-      let pl = this.padLeft
-      let pr = this.padRight
-      if (this.vis && this.columns == 1) {
-        pl = 1
-        pr = 1
-      }
-      // return 'col-sm-' + this.width + ' pl-' + pl + ' pr-' + pr;
-      return 'col' + ' pl-' + pl + ' pr-' + pr;
-    }, 
-  },
-  template: '<div v-show="this.vis" :class="columnClass"> \
+  template: '<div v-show="this.vis" class="col px-1"> \
                 <slot></slot> \
               </div>'
 })

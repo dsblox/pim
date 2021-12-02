@@ -55,6 +55,33 @@ function isDate(newTime) {
   }
 }
 
+class Hyperlink {
+  constructor(url, label, startIndex, endIndex) {
+    this.url = url
+    this.label = label
+    this.start = startIndex
+    this.end = endIndex
+  }
+
+  isIndexed() {
+    return (this.start != -1 && this.end != -1)
+  }
+
+  compare(another) {
+    if (this.start < another.start) {
+      return -1
+    }
+    if (this.start > another.start) {
+      return 1
+    }
+    return 0
+  }
+
+  getLabel() {
+    return this.label?this.label:"^"
+  }
+}
+
 
 // create our basic task view model
 class Task {
@@ -68,19 +95,29 @@ class Task {
     // this.today = today;
     // this.thisWeek = thisWeek;
     this.state = (complete?TaskState.COMPLETE:TaskState.NOT_STARTED);
-    this.tags = null;
+    this.tags = []; // must start empty vs. null so we can bind to it
+    this.links = []; // must start empty vs. null so we can bind to it
     // this.complete = complete;   // true if the task is done - OBSOLETE
   }
 
-  copy(taskSource) {
+  clone(taskSource) {
+    this.id = null
+    console.log('task.clone(): taskSource='+taskSource)
     if (taskSource != null) {
-      this.id = taskSource.id;
       this.name = taskSource.name;
       this.targetStartTime = taskSource.targetStartTime;
       this.actualCompletionTime = taskSource.actualCompletionTime;
       this.estimate = taskSource.estimate;
       this.state = taskSource.state;
       this.tags = taskSource.getCopyOfTags();
+      this.links = taskSource.getLinks();
+    }
+  }
+
+  copy(taskSource) {
+    if (taskSource != null) {
+      this.clone(taskSource)
+      this.id = taskSource.id;
     }
   }
 
@@ -92,13 +129,22 @@ class Task {
     return this.id != null;
   }
 
-  getName() {
+  // get the name and if there is a single link and it is requested
+  // then return the name as a hyperlink to that one link
+  getName(html = false) {
+    let result = null
     if (this.name && this.name.length > 0) {
-      return this.name;
+      result = this.name;
     }
     else {
-      return "<unnamed task>";
+      result = "<unnamed task>";
     }
+
+    let links = this.getLinks()
+    if (html && links.length == 1) {
+      result = "<a href=\"" + links[0].url + "\">" + this.name + "</a>"
+    }
+    return result
   }
 
   setName(newName) {
@@ -107,6 +153,24 @@ class Task {
 
   getState() {
     return this.state;
+  }
+
+  // for UI sorting reorder state enum as follows
+  //   1 = not started
+  //   2 = in progress
+  //   3 = on hold
+  //   4 = complete
+  // This was sort functions can compare on this "natural" ordering
+  getSortState() {
+    let result = 0
+    switch (this.state) {
+      case TaskState.NOT_STARTED: result = 1; break;
+      case TaskState.IN_PROGRESS: result = 2; break;
+      case TaskState.ON_HOLD:     result = 3; break;
+      case TaskState.COMPLETE:    result = 4; break;
+      default:                    result = 0; break;
+    }
+    return result;
   }
 
   setState(newState) {
@@ -152,6 +216,15 @@ class Task {
     return (this.tagIndex(tag) >= 0);
   }
 
+  isSysTagSet(tag) {
+    if (tag == "dontforget") {
+      return (!this.isTagSet("thisweek") && !this.isTagSet("today") && !this.isTagSet("reuse"))
+    }
+    else {
+      return this.isTagSet(tag)
+    }
+  }
+
   hasAllTags(tags) {
     return tags.every(this.isTagSet, this)
   }
@@ -169,17 +242,25 @@ class Task {
     return true;
   }
 
-  getTags(separator = null) {
+  getTags(separator = null, except = null) {
     if (this.tags != null) {
+
+      // if tags-to-exclude specified then exclude them
+      let tagsToUse = this.tags
+      if (except != null) {
+        tagsToUse = this.tags.filter(t => !except.includes(t))
+      }
+
+      // if separator specified then I want the tags as a string
       if (separator != null) {
-        return this.tags.join(separator);
+        return tagsToUse.join(separator)
       }
       else {
-        return this.tags;
+        return tagsToUse
       }
     }
     else {
-      return "";
+      return ""
     }
   }
 
@@ -372,21 +453,198 @@ class Task {
     return extractDateString(this.getTargetStartTime())
   }
 
-  getAsText() {
-    let result = this.startTimeString() + this.getName()
+  /*
+  ===============================================================
+   string()
+  ---------------------------------------------------------------
+   Inputs: html (default false) - include HTML hyperlinks
+
+   Return the task in string form for easy display in either HTML
+   or as text.  If HTML is specified the only change is the
+   addition of hyperlinks in the form of <a> tags.  Note that
+   hyperlinks are not included at all in the plain text version
+   of the task-as-string.
+
+   Basic format of the output is:
+      <time>: <name> (<duration>) [links]
+
+   Hyperlinks are formatted as follows based on the number of
+   links associated with the task:
+     * no hyperlinks - returns same a plain text
+     * 1 hyperlink   - link the entire name of the task
+     * >1 hyperlink  - include each link after duration
+
+   TBD: Support for name offsets to link multiple hyperlinks
+   within the name.  Holding off because although coded in link
+   object there is not yet support in the API or UI for this
+   anyway (8/21/21)
+  =============================================================*/  
+  string(html = false) {
+    // magic: in the case of html and 1 hyperlink, getName() creates the link
+    let result = this.startTimeString() + this.getName(html)
     let duration = this.estimateString()
     if (duration) {
       result += " (" + duration + ")"
     }
+
+    // in the case of multiple hyperlinks we append them to the end
+    if (html && this.getLinks().length > 1) {
+      result += this.getLinks().map(l => "&nbsp;<a href=\"" + l.url + "\">" + l.getLabel() + "</a>")
+    }
+
     return result
   }
 
-  getAsHTML() {
-    // same as text for now, but soon will have embedded links
-    // that will be different
-    return this.getAsText()
+  getAsText() {
+    return this.string()
   }
 
+  getAsHTML() {
+    return this.string(true)
+  }
+
+  /*
+  ===============================================================
+   addLink()
+  ---------------------------------------------------------------
+   Links allow one or more hyperlinks to be associated with a
+   a task, and optionally allows you to hyperlink within the
+   current name of the task (TBD: how will we handle adjusting
+   the link offsets into the name when the name is editted?)
+
+   The intended use of links is to allow the UI to handle them
+   flexibly in one of two ways:
+     1. a list of one or more hyperlinks associated with the task
+     2. embedded into the name of the task, with the idea being
+        that portions of the name make sense to be hyperlinked
+        (e.g. - Respond to <email> about <document>)
+
+   We support this by supporting two ways to specify the link's
+   labels, numbered by use cases above:
+     1. provide a link label with each link OR
+     2. provide indexes into the task's name
+
+   So there are two ways to get links back off a task:
+     1. getLinks() - provides a list of links and labels
+     2. getLinkedHTMLName() - provides a DIV tag with the name
+        and embedded A tags to the links.
+
+   HOWEVER: as of 8/16/21 we've not built the UI to manage
+   multiple links.  Well, kinda.  We've built a pim-link 
+   component that can (poorly) show a menu of links when set
+   on the task, but we have no UI in the modal or elsewhere to
+   manage the list of links.  So for now the modal always
+   maintains a single link - even though the underlying JS and
+   the server can maintain a list of links.  Also, as of today
+   we have no implemented a way to pass the text offsets
+   described above to the server.  So for now we support one
+   link per task, shown as an icon next to the task when it is
+   there.
+  =============================================================*/
+  getLinks() {
+    if (typeof this.links == 'undefined') {
+      this.links = []
+    }
+    return this.links
+  }
+
+  addLink(url, label = null, startIndex = -1, endIndex = -1) {
+
+    // create the list of links if none exists
+    if (typeof this.links == 'undefined') {
+      this.links = []
+    }
+
+    // create a hyperlink object to manage and add it
+    let link = new Hyperlink(url, label, startIndex, endIndex)
+
+    // TBD: don't allow multiple links to overlap - reject or
+    // adjust a link that would overlap
+
+    // add it to my array of links
+    this.links.push(link)
+  }
+
+  // clean out all the links - used for now since we don't
+  // have good UI to manage multiple links so we needed a
+  // way to keep the list of links clean
+  clearLinks() {
+    // splice to empty so vue doesn't lose its bindings
+    this.links.splice(0, this.links.length)
+  }
+
+  /*
+  =====================================================
+   hasEmbeddedHyperlinks()
+  -----------------------------------------------------
+   Determines if this task has any hyperlinks that are
+   "indexed" - meaning that the user intends for them
+   to be linked within the display of the name of the
+   task.  Note that it is possible for links to exist
+   and not be embedded, in which case they are not
+   displayed in the name, but rather are displayed in
+   some other manner (tbd).
+  ===================================================*/
+  hasEmbeddedHyperlinks() {
+    if (typeof this.links == 'undefined') {
+      return false
+    }
+    else {
+      return this.links.reduce(function(isIndexed, curr) {
+                                  if (!isIndexed) {
+                                    isIndexed = curr.isIndexed()
+                                  }
+                                  return isIndexed
+                                }, 
+                                false)
+    }
+  }
+
+
+  /*
+  ===============================================================
+   getLinkedHTMLName()
+  ---------------------------------------------------------------
+   Returns a <span> with the task name and embedded HTML <a> tags 
+   for each link stored on this task in the proper positions.  
+   Note that this returns NULL if there are no links in the name, 
+   indicating to the caller that they are free to link the name 
+   in other ways if they so desire.
+
+   Note that if links are overlapping, then (as coded today) the
+   first link will be included, and anything overlapping will
+   simply be silently skipped.
+
+   UNTESTED AS OF 8/7/21!
+  =============================================================*/
+  getLinkedHTMLName() {
+    if (this.hasEmbeddedHyperlinks()) {
+      const taskName = this.getName()
+      const orderedLinks = this.links.sort((a,b)=>{return a.compare(b)})
+      let linkedName = "<span>"
+      let currLen = 0
+      for (let i = 0; i < this.links.length; i++) {
+        curr = this.links[i]
+        if (curr.isIndexed()) {
+          if (curr.start > currLen) {
+            linkedName += taskName.substring(currLen, curr.start)
+            linkedName += '<a href="' + curr.url + '">'
+            linkedName += taskName.substring(curr.start, curr.end)
+            linkedName += '</a>'
+            currLen = curr.start
+          } // if need to "fill in" from last link (also checks for overlap)
+        } // if the link has indexes into the name
+      } // for each link
+
+      // add anything not linked from the name to the end and close out
+      linkedName += taskName.substring(currLen)
+      linkedName += "</span>"
+      return linkedName
+    }
+    else {
+      return null
+    }
+  }
 
 } // class Task
 

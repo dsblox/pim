@@ -69,15 +69,15 @@
 
     <div class="row ml-0 mr-0 p-0">
 
-      <pim-column slot-name="left" :columns="columns" :show="visLists[0]" >
+      <pim-column :show="leftShow" >
         <pim-task-list :task-list="all" :title="titleLists[0]" time :state="0" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
       </pim-column>
 
-      <pim-column slot-name="center" :columns="columns" :show="visLists[1]" >
+      <pim-column :show="centerShow" >
         <pim-task-list :task-list="all" :title="titleLists[1]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
       </pim-column>
 
-      <pim-column slot-name="right" :columns="columns" :show="visLists[2] || visLists[3]" > 
+      <pim-column :show="rightShow" > 
         <div class="row">
             <div class="col-sm-12">
               <pim-task-list :task-list="all" :title="titleLists[2]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
@@ -127,25 +127,28 @@ v = new Vue({
     dragListTitle: null,
     nav: mainMenu,
     warnMessage: null,
-    warnShow: false,
-    columns: 3,
+    warnShow: false, // note: could not get vue reactive directly
+    leftShow: true,  //       against the visLists array of bools!
+    centerShow: true,//       so had to create these bools
+    rightShow: true,
     titleLists: ["Calendar", "Stuff To Do", "In Progress", "Done"],
     visLists: [true, true, false, true]
   },
   methods: {
-    numtasks: function(args) { // adjust num columns based on which lists are visible
+    // adjust column visibility based on which lists are empty
+    numtasks: function(args) { 
       let idxChange = this.titleLists.indexOf(args.list)
-      if (idxChange >= 0) {
+      if (idxChange >= 0 && idxChange < this.visLists.length) {
         let vis = (args.count > 0)
         this.visLists[idxChange] = vis
-        let cols = 0
-        if (this.visLists[0]) cols += 1
-        if (this.visLists[1]) cols += 1
-        if (this.visLists[2] || this.visLists[3]) cols +=1
-        this.columns = cols
+        this.leftShow = this.visLists[0]
+        this.centerShow = this.visLists[1]
+        this.rightShow = this.visLists[2] || this.visLists[3]
       }
     },
     modal: function(taskInfo) {
+      // the modal component is bound to this.modalTask, so when we 
+      // set modalTask to something new it knows to show itself
       this.modalTask = taskInfo.task ? taskInfo.task : new Task()
       this.modalList = taskInfo.list
       this.modalTags = taskInfo.tags

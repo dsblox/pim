@@ -30,6 +30,7 @@ type TaskYAML struct {
 	ActualCompletionTime *time.Time // time task is marked done
 	Estimate int					// estimate for the task in minutes
 	Tags []string 			 		// attributes of the task
+	Links []string					// hyperlinks assoicated with the task
 	Parents []string 		 		// ids of the parents for later hookup
 }
 type TasksYAML struct {
@@ -86,16 +87,24 @@ func singleQuoteYAML(raw string) string {
 }
 
 func (tm *TaskDataMapperYAML) writeTask(f *os.File , t *Task) error {
+	if len(t.links) > 0 {
+		// fmt.Printf("writeTask: links= %v, %v\n", t.links, t.GetLinks())
+	}
 	var parentIds []string = t.GetParentIds(false)
 	var estimate int = int(t.Estimate.Minutes())
 	var tags []string = t.GetTags()
+	var links []string = t.GetLinks()
 	strTags := ""
 	if len(tags) > 0 {
 		strTags = "'" + strings.Join(tags, "', '") + "'"
 	}
+	strLinks := ""
+	if len(links) > 0 {
+		strLinks = "'" + strings.Join(links, "', '") + "'"
+	}
 
-	_, err := fmt.Fprintf(f, "- {id: %s, parents: %v, name: %s, state: %s, estimate: %d, tags: [%s], targetstarttime: %s, actualstarttime: %s, actualcompletiontime: %s }\n", 
-		                  t.GetId(), parentIds, singleQuoteYAML(t.GetName()), t.GetState(), estimate, strTags, 
+	_, err := fmt.Fprintf(f, "- {id: %s, parents: %v, name: %s, state: %s, estimate: %d, tags: [%s], links: [%s], targetstarttime: %s, actualstarttime: %s, actualcompletiontime: %s }\n", 
+		                  t.GetId(), parentIds, singleQuoteYAML(t.GetName()), t.GetState(), estimate, strTags, strLinks,
 		                  TimeYAML(t.GetTargetStartTime()),
 		              	  TimeYAML(t.GetActualStartTime()),
 		              	  TimeYAML(t.GetActualCompletionTime()))
@@ -195,6 +204,12 @@ func (tm *TaskDataMapperYAML) addChildTask(parent* Task, yt* TaskYAML) (error, *
 	for _,v := range yt.Tags {
 		child.SetTag(v)
 	}
+
+	for _,v := range yt.Links {
+		if (len(v) > 0) {
+			child.AddLink(v, 0, 0)
+		}
+	}	
 
 	parent.AddChild(child)
 	return nil, child
