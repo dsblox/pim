@@ -271,7 +271,7 @@ func (list Tasks) FindUniqueCompletionDates() []time.Time {
 // NewTask: create a new task with a name, assign a unique id, and default settings
 // When we break Tasks into its own package we will rename this to just "New()"
 func NewTask(newName string) *Task {
-	id,_ := uuid.NewV4()
+	id := uuid.NewV4()
 	return &Task{id:id.String(), name:newName, state:notStarted, memoryonly:false}
 }
 
@@ -279,7 +279,7 @@ func NewTask(newName string) *Task {
 // so you can iterate over them or manipulate them, but designated never to be
 // saved- note that it does have an id
 func NewTaskMemoryOnly(newName string) *Task {
-	newId,_ := uuid.NewV4()
+	newId := uuid.NewV4()
 	return &Task{id:newId.String(), name:newName, state:notStarted, memoryonly:true}	
 }
 

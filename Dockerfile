@@ -1,7 +1,7 @@
-FROM golang:1.8
+FROM golang:1.17-alpine
 
 # download the pim, build it and install it
-RUN go get github.com/dsblox/pim/... #force by changing this number 12
+RUN go get github.com/dsblox/pim/... 
 
 # set up some aliases useful in our development environment
 RUN echo 'alias cd-pim="cd /go/src/github.com/dsblox/pim"' >> ~/.bashrc
