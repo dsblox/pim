@@ -58,16 +58,16 @@
 <div id="pim-root">
 
   <div>
-    <pim-navbar :items="nav" selected="Home" />
+    <pim-navbar :items="nav" selected="Home" @undo="undo()"/>
   </div>
 
   <div class="container-fluid">
 
     <div class="row ml-1 mr-1 mb-0 p-0">
-      <pim-title-bar title="Today" :tags="allTags" :selected="selectedTags" :add="true" @modal="modal({task:null,list:all,tags:['today']})" />
+      <pim-title-bar title="Today" :tags="allTags" :selected="selectedTags" :add="true" :box="true" @modal="modal({task:null,list:all,tags:['today']})" />
     </div>
 
-    <div class="row ml-0 mr-0 p-0">
+    <div v-if="!boxView" class="row ml-0 mr-0 p-0">
 
       <pim-column :show="leftShow" >
         <pim-task-list :task-list="all" :title="titleLists[0]" time :state="0" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
@@ -92,6 +92,20 @@
 
     </div>
 
+    <div v-if="boxView" class="row ml-0 mr-0 p-0">
+      <div class="col-sm-6">
+        <pim-task-list :task-list="all" title="1 - Important and Urgent" :state="0" @drop="drop" @modal="modal" :tags="['Important','Urgent'].concat(selectedTags)" systag="today" @numtasks="numtasks" />
+      </div>
+      <div class="col-sm-6">
+        <pim-task-list :task-list="all" title="2 - Important and not Urgent" :state="0" @drop="drop" @modal="modal" :tags="['Important','!Urgent'].concat(selectedTags)" systag="today" @numtasks="numtasks" />
+      </div>
+      <div class="col-sm-6">
+        <pim-task-list :task-list="all" title="3 - Not Important but Urgent" :state="0" @drop="drop" @modal="modal" :tags="['Urgent','!Important'].concat(selectedTags)" systag="today" @numtasks="numtasks" />
+      </div>
+      <div class="col-sm-6">
+        <pim-task-list :task-list="all" title="4 - Not Important or Urgent" :state="0" @drop="drop" @modal="modal" :tags="['!Urgent','!Important'].concat(selectedTags)" systag="today" @numtasks="numtasks" />
+      </div>
+    </div>
   </div>
 
   <div>
@@ -105,11 +119,22 @@
 
 <script>
 
-// call the server to get tasks and put into the lists
-loadTasksToday();
+// useful function to refresh ourselves - currently
+// used for initialization and on any undo since we
+// don't know exactly what was undone.
+function refreshToday() {
+  todaylist.empty()
+  loadTasksToday()
 
-// all the tags are loaded into global allTags
-tagsFindAll();
+  while(allTags.length > 0) {
+    allTags.pop();
+  }
+  tagsFindAll()
+}
+
+
+// load up my view from the server
+refreshToday()
 
 // here is a root Vue to hold references to my models
 // the data references can be linked to components
@@ -132,7 +157,15 @@ v = new Vue({
     centerShow: true,//       so had to create these bools
     rightShow: true,
     titleLists: ["Calendar", "Stuff To Do", "In Progress", "Done"],
-    visLists: [true, true, false, true]
+    visLists: [true, true, false, true],
+    boxView: false,
+    refreshNow: refreshNow, // trigger to force refresh of screen
+  },
+  watch: {
+    // the rest of the app can force us to refresh by changing refreshNow
+    'refreshNow.i': function(oldVal, newVal) {
+      refreshToday()
+    }
   },
   methods: {
     // adjust column visibility based on which lists are empty
@@ -194,7 +227,10 @@ v = new Vue({
     },
     warnDismiss: function(visible) {
       this.warnShow = false
-    }    
+    },
+    undo: function() {
+      cmdUndo() // execute undo on server
+    }
   },
 })
 

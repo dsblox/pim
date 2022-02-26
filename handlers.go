@@ -14,6 +14,7 @@ import (
     "github.com/gorilla/mux"
 )
 
+
 // Task: our central type for the whole world here - will become quite large over time
 type TaskJSON struct {
     Id string  `json:"id"`        // unique id of the task - TBD make this pass through to mapper!!!
@@ -112,6 +113,19 @@ func fromTasks(ts Tasks) []TaskJSON {
         js = append(js, j)
     }
     return js
+}
+
+// Cmd: this is the outer envelope of all our responses
+// NOT YET USED EXCEPT FOR UNDO- but can later be used 
+// to standardize all our response envelopes.  For now, 
+// each API callreturns a custom JSON blob for its own use.
+type CmdJSON struct {
+    Command    string   `json:"cmd"`
+    TargetName string   `json:"target"`
+    Status     int      `json:"status"`
+    Error      PimError `json:"error"`
+    Task       TaskJSON `json:"task"`
+    TaskIds  []TaskJSON `json:"tasks"`
 }
 
 
@@ -330,7 +344,7 @@ func taskRead(w http.ResponseWriter, r *http.Request) *TaskJSON {
     if err := r.Body.Close(); err != nil {
         panic(err)
     }
-    fmt.Printf("taskRead() payload received: %s\n", body)
+    // fmt.Printf("taskRead() payload received: %s\n", body)
     if err := json.Unmarshal(body, &task); err != nil {
         errorResponse(w, pimErr(badRequest))
         fmt.Print("taskRead(): ")
@@ -353,7 +367,8 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
     // var t Task
     taskJSON.ToTask(t, false)
     master.AddChild(t)
-    err := t.Save(true)
+    // err := t.Save(true)
+    err := CommandCreateTask(t)
     if (err != nil) {
         fmt.Printf("TaskCreate: save failed with errror: %s\n", err)
         w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -372,7 +387,6 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func TaskReplace(w http.ResponseWriter, r *http.Request) {
-    log.Println("replace")
 
     // extract the task id from the request
     vars := mux.Vars(r)
@@ -387,6 +401,10 @@ func TaskReplace(w http.ResponseWriter, r *http.Request) {
       return
     }
 
+    // record the task as it appears before modification
+    // to support undo
+    cmd := CommandModifyTaskBegin(t)
+
     // read the task from the request
     taskJSON := taskRead(w, r)
     if taskJSON == nil {
@@ -400,13 +418,16 @@ func TaskReplace(w http.ResponseWriter, r *http.Request) {
     }
 
     // fmt.Println(task.GetEstimate())
-    log.Println("Task as received from client...")
-    log.Printf("%+v\n", taskJSON)
+    // log.Println("Task as received from client...")
+    // log.Printf("%+v\n", taskJSON)
 
 
     // replace all fields of the current task from the request
     taskJSON.ToTask(t, false)
-    err := t.Save(false)
+
+    // run the command for the undo stack
+    err := CommandModifyTaskEnd(cmd, t)
+    // err := t.Save(false)
 
     if (err != nil) {
         fmt.Printf("TaskReplace: save failed with errror: %s\n", err)
@@ -443,6 +464,8 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
       return
     }
 
+    cmd := CommandModifyTaskBegin(t)
+
     // read the task from the request
     taskJSON := taskRead(w, r)
     if taskJSON == nil {
@@ -459,7 +482,8 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
     taskJSON.ToTask(t, true)
 
     // log.Printf("update: %+v\n", taskJSON)
-    t.Save(false)
+    // t.Save(false)
+    CommandModifyTaskEnd(cmd, t)    
 
     // set the successful response to include replaced task
     w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -484,10 +508,9 @@ func TaskDelete(w http.ResponseWriter, r *http.Request) {
       return
     }
 
-    // delete the task which will immediately delete in storage
-    // the parameter is for a new parent of any of this tasks
-    // children - which we may wish to support later
-    t.Remove(nil)
+    // call the command system to perform the delete
+    // TBD - report errors actually doing the delete
+    CommandDeleteTask(t, nil)
 
     // set the successful response to indicate deletion
     w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -562,3 +585,28 @@ func TaskReorder(w http.ResponseWriter, r *http.Request) {
 }
 
 
+/*
+==============================================================================
+ Undo()
+------------------------------------------------------------------------------
+============================================================================*/
+func Undo(w http.ResponseWriter, r *http.Request) {
+    // fmt.Printf("Undo(): entry\n")
+    err := CommandUndo()
+    if (err != nil) {
+        errorResponse(w, pimErr(undoEmpty))
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.WriteHeader(http.StatusOK)
+
+    var undoResponse CmdJSON
+    undoResponse.Command = "UNDO"
+    undoResponse.TargetName = "unknown task"
+    undoResponse.Status = 0 // ok
+
+    if err := json.NewEncoder(w).Encode(undoResponse); err != nil {
+        panic(err)
+    }
+}

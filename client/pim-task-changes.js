@@ -15,6 +15,65 @@
    * the state change is reflected on the server.
 ========================================================================*/
 
+
+/*
+=========================================================================
+ TaskCmd
+-------------------------------------------------------------------------
+ This command enum was originally created to support a client-side undo
+ stack until I decided undo had to live on the server.  I removed the
+ client-side undo code, but still felt this command enum was a useful
+ abtraction to use in supporting the persistTask function, so I kept
+ it for now.  We may choose to lose it later.
+=======================================================================*/
+var TaskCmd = {
+  CREATE:     0,
+  DELETE:     1,
+  EDIT:       2,
+  BULKCREATE: 3, // not supported
+  BULKEDIT:   4, // not supported
+  UPSERT:     5,
+};
+
+/*
+=========================================================================
+ persistTask
+-------------------------------------------------------------------------
+ Inputs: task  - the task to be persisted
+         cmdId - what to do with the task (default to UPSERT)
+
+ This function was created when we were building an undo stack on the
+ client, but kept even when we moved undo to the server because it
+ seems useful to centralize all the ajax calls to persist a task to the
+ server in one place.
+=======================================================================*/
+function persistTask(task, cmdId = TaskCmd.UPSERT) {
+
+  // handle upsert case where caller isn't sure of operation
+  if (cmdId === TaskCmd.UPSERT) {
+    cmdId = (task.getId() == null?TaskCmd.CREATE:TaskCmd.REPLACE)
+  }
+
+  // call the right persistence methos
+  switch (cmdId) {
+    case TaskCmd.CREATE: 
+      createTask(task)
+      break;
+    case TaskCmd.REPLACE:
+      replaceTask(task)
+      break;
+    case TaskCmd.UPDATE:
+      updateTask(task)
+      break;
+    case TaskCmd.DELETE:
+      killTask(task)
+      break;
+    default:
+      console.log("persistTask(): error - bad command id provided")
+      break;
+  }
+}
+
 /*
 =========================================================================
  Navigation Menu
@@ -43,6 +102,10 @@ function pimShowError(message) {
   v.warn(message)
 }
 
+function forceRefresh() {
+  console.log("forceRefresh(): incrementing global refresh now to " + (refreshNow.i+1))
+  refreshNow.i++
+}
 
 /*
 --------------------------------------------------------------------------
@@ -72,6 +135,7 @@ var completedTaskDates = [];
 var selectedTags = [];   // list of which tags are selected for filtering
 var allTags      = [];   // list of all tags in popularity order
 var currTags     = [];   // list of tags in the current task for modal
+var refreshNow   = {i:0};// all views watch so any change refreshes UI
 
 /*
 =========================================================================
@@ -168,10 +232,11 @@ function modalTaskSave(modalTask, list, sysTags) {
 
   if (sysTags != null) {
     sysTags.forEach(function(sysTag) { t.addTag(sysTag) })
+    // hrm - we eat any errors if the tag can't be set!
   }
 
-  // write the task to the server
-  createOrReplaceTask(t)
+  // write the task to the server and handle undo stack
+  persistTask(t, TaskCmd.UPSERT)
 
   // add the task to the list the modal wants to use
   if (list != null) {
@@ -181,13 +246,16 @@ function modalTaskSave(modalTask, list, sysTags) {
   return t;
 }
 
+// create a new copy of the task except change some tags.
+// used to easily generate commonly re-used tags from a
+// list of reusable tasks.
 function cloneTaskSwapTags(sourceTask, list, remove, add) {
   let t = new Task()
   t.clone(sourceTask)
   console.log("cloneTaskSwapTags: t.id = "+t.getId())
   t.removeTag(remove)
   t.addTag(add)
-  createOrReplaceTask(t)
+  persistTask(t, TaskCmd.CREATE)
   if (list != null) {
     list.insertTask(t)
   }  
@@ -209,8 +277,8 @@ function deleteTask(task) {
 		return;
 	}
 
-  // delete the task from the server (when we write it)
-  killTask(task);
+  // save the task and handle undo
+  persistTask(task, TaskCmd.DELETE)
 }
 
 
@@ -251,7 +319,7 @@ function changeTaskState(task) {
 
   // call the server to update the task persistently
   // only changing the "dirty" elements
-  updateTask(task);    
+  persistTask(task, TaskCmd.UPDATE)
 }
 
 function moveInArray(arr, from, to) {
@@ -311,7 +379,7 @@ function clearTagFromList(list, tagToClear, onlyCompleted) {
     if (attemptToRemove && t.removeTag(tagToClear)) {
       t.resetTags = [tagToClear]
       t.setTags = []
-      updateTask(t)
+      persistTask(t, TaskCmd.UPDATE)
     }
   } )
 }
@@ -338,7 +406,7 @@ function writeTagChange(task, tag) {
     task.resetTags = [tag];
     task.setTags = [];
   }
-  updateTask(task);
+  persistTask(task, TaskCmd.UPDATE);
 }
 
 

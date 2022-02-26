@@ -29,6 +29,7 @@
         <button type="button" class="btn btn-primary" onclick="apiLoadTasks()">List Tasks</button>
         <button type="button" class="btn btn-primary" onclick="apiLoadTags()">List Tags</button>
         <button type="button" class="btn btn-primary" onclick="apiFindDates()">Search</button>
+        <button type="button" class="btn btn-primary" onclick="apiUndo()">Undo</button>
         <div id="list">
         </div>
         </div>
@@ -236,7 +237,7 @@ function apiTaskDone(task) {
 }
 
 function apiLoadTask(id) {
-  collectTask(id, apiTaskDone)
+  collectTask(id, apiTaskDone, displayRawResponse)
 }
 
 function taskItemHTML(task) {
@@ -269,7 +270,7 @@ function apiLoadTasks() {
     strdate = null;
   }
 
-  collectTasks(tasksFindURL(strdate), null, apiListDone)
+  collectTasks(tasksFindURL(strdate), null, apiListDone, displayRawResponse)
 }
 
 function tagListHTML(mapTags) {
@@ -286,7 +287,7 @@ function apiTagsDone(mapTags) {
 
 function apiLoadTags() {
   console.log("pim-api: apiLoadTags()")
-  collectTags(apiTagsDone)
+  collectTags(apiTagsDone, displayRawResponse)
 }
 
 function apiFindDates() {
@@ -303,7 +304,7 @@ function apiFindDates() {
   // hard code today
   console.log("date=<" + strFromDate + ">")
 
-  collectTasks(tasksFindDateURL(strFromDate, strToDate), null, apiListDone)  
+  collectTasks(tasksFindDateURL(strFromDate, strToDate), null, apiListDone, displayRawResponse)
 }
 
 /*
@@ -332,12 +333,12 @@ function apiPrepareTask(includeId = true) {
 
 function apiCreateTask() {
   console.log("pim-api: apiCreateTask()")
-  createTask(apiPrepareTask(false))
+  createTask(apiPrepareTask(false), displayRawResponse)
   // writeTask("POST"); // POST means create
 }
 function apiReplaceTask() {
   console.log("pim-api: apiReplaceTask()")
-  replaceTask(apiPrepareTask());
+  replaceTask(apiPrepareTask(), displayRawResponse);
 }
 function apiUpdateTask() {
   console.log("pim-api: apiUpdateTask()")
@@ -349,12 +350,17 @@ function apiUpdateTask() {
   var task = apiPrepareTask();
   // task.dirty = ["name", "state", "estimate", "targetstarttime", "actualcompletiontime"];
   task.dirty = ["estimate"];
-  updateTask(task);
+  updateTask(task, displayRawResponse);
 }
 
 function apiDeleteTask() {
   console.log("pim-api: apiDeleteTask()")
-  killTask(apiPrepareTask());
+  killTask(apiPrepareTask(), displayRawResponse);
+}
+
+function apiUndo() {
+  console.log("pim-api: apiUndo()")
+  cmdUndo(displayRawResponse)
 }
 
 </script>

@@ -13,7 +13,6 @@
 ============================================================================*/
 
 
-
 /*
 ======================================================================
  pim-task-links
@@ -602,7 +601,7 @@ Vue.component('pim-task-list', {
       var filtered = this.taskList.filter(function(t) {
         return ((this.state === undefined || t.state == this.state) && 
                 (this.time === undefined || t.hasStartTime() == this.time) &&
-                (this.tags == null || t.hasAllTags(this.tags)) &&
+                (this.tags == null || t.matchTags(this.tags)) &&
                 (this.systag == null || t.isSysTagSet(this.systag)))
       }, this)
 
@@ -688,6 +687,7 @@ Vue.component('pim-task-list', {
          add      - whether or not to show an "add task" icon
          tags     - list of tags to show in the bar for selection
          selected - list of tags currently selected
+         box      - include the box toggle
 
  Events: modal   - emitted if add button was clicked
 
@@ -698,13 +698,24 @@ Vue.component('pim-task-list', {
  notice that a new task has been set on me.
 ====================================================================*/
 Vue.component('pim-title-bar', {
-  props: ['tags', 'selected', 'title', 'add'],
+  props: ['tags', 'selected', 'title', 'add', 'box'],
+  data: function() {
+    return {
+      boxView: this.$root.boxView
+    }
+  },
   methods: {
     newtask: function() { // our add-a-task button was clicked
       this.$emit('modal', null);      
     },
     tagClick: function(tag) {
       toggleTag(tag)      
+    },
+    boxClick: function() {
+      // might be nicer to dynamically bind the root bool
+      // but I decided to cheat here.
+      this.$root.boxView = !this.$root.boxView
+      this.boxView = this.$root.boxView
     }
   },
   template: '<div class="col-12 card bg-primary text-white"> \
@@ -714,6 +725,9 @@ Vue.component('pim-title-bar', {
                      <pim-add v-if="this.add" @newtask="newtask"/>\
                    </div> \
                    <div class="small"> \
+                      <span v-if="this.box" v-on:click="boxClick" :style="this.boxView?\'color:black;\':\'color:white;\'"> \
+                        <i class="fa fa-th-large fa-lg">&nbsp;&nbsp;</i> \
+                      </span> \
                      <pim-tagpicker :tags="tags" :selected="selected" :tiles=true :menu=false @tagclick="tagClick" /> \
                    </div> \
                  </div> \
@@ -825,8 +839,11 @@ Vue.component('pim-modal', {
     },
   },
   computed: {
+    creating: function() { // controls appearance of delete button and title of box
+      return (this.t.name == null)
+    },
     title: function() { // set the modal title based on whether a task was provided
-      if (this.task) {
+      if (!this.creating) {
         return "Edit Task" //  + this.task.getName();
       } else {
         return "Create New Task"
@@ -901,7 +918,7 @@ Vue.component('pim-modal', {
                       <input type="hidden" id="thisweek" value="false"> \
                     </div> \
                     <div class="modal-footer"> \
-                      <button type="button" class="btn btn-secondary" data-dismiss="modal" v-on:click="deltask" id="delete">Delete Task</button> \
+                      <button v-if="!creating" type="button" class="btn btn-secondary" data-dismiss="modal" v-on:click="deltask" id="delete">Delete Task</button> \
                       <!-- button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel">Cancel</button --> \
                       <button type="submit" class="btn btn-primary" data-dismiss="modal" v-on:click="save" id="save">Save Task</button> \
                     </div> \
@@ -931,6 +948,11 @@ Vue.component('pim-navitem', {
 
 Vue.component('pim-navbar', {
   props: ['items', 'selected'],
+  methods: {
+    undo: function() { 
+      this.$emit('undo')
+    },
+  },  
   template: ' \
               <nav class="navbar navbar-default navbar-expand-sm navbar-light bg-light rounded"> \
                 <a class="navbar-brand" href="#">PIM</a> \
@@ -942,6 +964,9 @@ Vue.component('pim-navbar', {
                     <pim-navitem v-for="item in items" :key="item.display" :name="item.display" :target="item.route" :selected="item.display==selected" /> \
                   </ul> \
                   <ul class="nav navbar-nav ml-auto"> \
+                    <li class="nav-item"> \
+                      <a class="nav-link" href="#" @click="undo"><span class="fa fa-undo"></span> Undo</a> \
+                    </li> \
                     <li class="nav-item"> \
                       <a class="nav-link" href="#"><span class="fa fa-user"></span> Sign Up</a> \
                     </li> \

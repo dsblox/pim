@@ -181,6 +181,13 @@ class TaskList {
     this.tasks = [];
   }
 
+  empty() {
+    var len = this.tasks.length;    
+    for (var i = len-1; i >= 0; i--) {
+      this.tasks.splice(i,1);
+    }
+  }
+
   copy(target) {
     target.clean();
     var len = this.tasks.length;

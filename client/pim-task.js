@@ -55,6 +55,16 @@ function isDate(newTime) {
   }
 }
 
+function hasNOTTagPrefix(tag) {
+  return (tag.charAt(0) == '!')
+}
+
+function isLegalTag(tag) {
+  return !hasNOTTagPrefix(tag)
+}
+
+
+
 class Hyperlink {
   constructor(url, label, startIndex, endIndex) {
     this.url = url
@@ -102,7 +112,7 @@ class Task {
 
   clone(taskSource) {
     this.id = null
-    console.log('task.clone(): taskSource='+taskSource)
+    // console.log('task.clone(): taskSource='+taskSource)
     if (taskSource != null) {
       this.name = taskSource.name;
       this.targetStartTime = taskSource.targetStartTime;
@@ -209,11 +219,15 @@ class Task {
     if (this.tags == null) {
       return -1;
     }
-    return this.tags.indexOf(tag);    
+    return this.tags.indexOf(tag)  
   }
 
   isTagSet(tag) {
-    return (this.tagIndex(tag) >= 0);
+    return (this.tagIndex(tag) >= 0)
+  }
+
+  isTagNotSet(tag) {
+    return (this.tagIndex(tag) < 0)
   }
 
   isSysTagSet(tag) {
@@ -229,14 +243,40 @@ class Task {
     return tags.every(this.isTagSet, this)
   }
 
+  doesntHaveTags(tags) {
+    return tags.every(this.isTagNotSet, this)    
+  }
+
+  // return true if all tag-specs provided match the tags
+  // set on this task.  Any provided tags prefixed with !
+  // must NOT be on the task, any provided tags without a
+  // prefix MUST BE ON the task for this function to return
+  // true.
+  matchTags(tags) {
+    let stillAMatch = true
+    for (let i = 0; stillAMatch && i < tags.length; i++) {
+      let tag = tags[i]
+      if (hasNOTTagPrefix(tag)) {
+        stillAMatch = this.isTagNotSet(tag.substring(1))
+      }
+      else {
+        stillAMatch = this.isTagSet(tag)
+      }      
+    }
+    return stillAMatch
+  }
+
   // returns false if tag is already set
   // TBD: validate tags have no spaces or slashes
   addTag(tag) {
     if (this.tags == null) {
-      this.tags = [];
+      this.tags = []
     }
     if (this.isTagSet(tag)) {
-      return false;
+      return false
+    }
+    if (!isLegalTag(tag)) {
+      return false // error - a tag can't start with !
     }
     this.tags.push(tag);
     return true;
@@ -549,6 +589,15 @@ class Task {
   }
 
   addLink(url, label = null, startIndex = -1, endIndex = -1) {
+
+    // for now the only illegal character to reject is single
+    // quote since it breaks our yaml persistence - but perhaps
+    // in the future escape the url (encodeURIComponent)?
+    if (!url || url.indexOf("'") != -1) {
+      console.log("task.addLink() - unable to add URL " + url + " to task " + this.name)
+      return // ugh - no easy way to indicate an error to caller
+    }
+
 
     // create the list of links if none exists
     if (typeof this.links == 'undefined') {

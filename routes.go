@@ -113,6 +113,12 @@ var routes = Routes{
         HandlerFunc: TaskReorder,
     }, 
     Route{
+        Name: "Undo",
+        Method: "GET",
+        Pattern: "/undo",
+        HandlerFunc: Undo,
+    }, 
+    Route{
         Name: "ServerStatus",
         Method: "GET",
         Pattern: "/status",

@@ -290,6 +290,7 @@ func runConsoleApp(dbName string) {
 // for now keep a global - temp as we build our API
 // eventually we'll move this in somewhere else
 var master *Task
+var commands *commandHistory
 
 func runServerApp(port string, files string, certs string, dbName string) {
 	log.Printf("Will run as server soon\n")	

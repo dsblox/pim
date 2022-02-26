@@ -71,6 +71,7 @@ function timeToForm(date) {
 
 
 
+
 /*
 =========================================================================
  URL Functions
@@ -83,7 +84,8 @@ function timeToForm(date) {
   * tasksTodayURL - finds all today tasks
   * tasksThisWeekURL - finds all thisweek tasks
   * tasksCompleteURL - finds all complete tasks in the system
-  * tasksFundURL - finds all tasks at a certain date
+  * tasksFindURL - finds all tasks at a certain date
+  * undoURL - calls the server to undo the most recent action
 ========================================================================*/
 // we should find a way to make this more dynamic
 var baseURL = "https://localhost:4000/";
@@ -99,6 +101,10 @@ function makeURL(cmd, tags = null) {
 
 function serverStatusURL() {
   return makeURL("status")
+}
+
+function undoURL() {
+  return makeURL("undo")
 }
 
 function tasksURL(id = "") {
@@ -203,6 +209,39 @@ function serverStatus() {
   ajaxGet(ajax, serverStatusURL());  
 }
 
+/*
+=========================================================================
+ cmdUndo
+-------------------------------------------------------------------------
+ For now the only exposed function on the server is to undo.  This
+ section of the code may be expanded to add redo() or other command
+ system functions over time.
+========================================================================*/
+function cmdUndo(rawResponseCallback = null) {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (rawResponseCallback != null) {
+        rawResponseCallback(this.status, this.responseText)
+      }      
+      if (this.status == 200) {
+        let response = JSON.parse(this.responseText)
+        if (response && response.code == 4) {
+          pimShowError("Nothing to Undo");
+        }
+        else {
+          // note the caller cannot do this because... async
+          forceRefresh()
+        }
+      }
+      else {
+        console.log("cmdUndo(): failed http response: " + this.status);
+        pimShowError(this.responseText);
+      }
+    }
+  };
+  ajaxGet(ajax, undoURL());    
+}
 
 /*
 =========================================================================
@@ -225,7 +264,7 @@ function serverStatus() {
 -------------------------------------------------------------------------
  killTask()
 -----------------------------------------------------------------------*/
-function killTask(task) {
+function killTask(task, rawResponseCallback = null) {
 
   // validate inputs that we have a task and a valid id
   var id = "";
@@ -239,6 +278,9 @@ function killTask(task) {
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
+      if (rawResponseCallback != null) {
+        rawResponseCallback(this.status, this.responseText)
+      }      
       if (this.status == 200) {
         console.log("success: task deleted");
       }
@@ -275,7 +317,7 @@ function killTask(task) {
       booleans into server tags.  I don't think it is needed anymore
       since we got rid of the booleans on the JS side!
 -----------------------------------------------------------------------*/
-function writeTask(task, directive) {
+function writeTask(task, directive, rawResponseCallback = null) {
 
   if (task == null) {
     console.log("writeTask() error: null task provided");
@@ -313,6 +355,9 @@ function writeTask(task, directive) {
 
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
+      if (rawResponseCallback != null) {
+        rawResponseCallback(this.status, this.responseText)
+      }      
       if (this.status == 200 || this.status == 201) {
         // console.log("success: task created or updated");
 
@@ -355,25 +400,16 @@ function writeTask(task, directive) {
   * task.setTags[] - tags to write to the task on the server
   * task.resetTags[] = tags to turn OFF on the server
 -----------------------------------------------------------------------*/
-function updateTask(task) {
-  writeTask(task, "PATCH");
+function updateTask(task, rawResponseCallback = null) {
+  writeTask(task, "PATCH", rawResponseCallback);
 }
 
-function createTask(task) {
-  writeTask(task, "POST");
+function createTask(task, rawResponseCallback = null) {
+  writeTask(task, "POST", rawResponseCallback);
 }
 
-function replaceTask(task) {
-  writeTask(task, "PUT");
-}
-
-function createOrReplaceTask(task) {
-  if (task.getId() == null) {
-    createTask(task) 
-  }
-  else {
-    replaceTask(task)
-  }  
+function replaceTask(task, rawResponseCallback = null) {
+  writeTask(task, "PUT", rawResponseCallback);
 }
 
 
@@ -454,10 +490,13 @@ function taskJsonToJs(jsonTask) {
   return t;
 }
 
-function collectTasks(url, taskCallback, doneCallback = null) {
+function collectTasks(url, taskCallback, doneCallback = null, rawResponseCallback = null) {
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
+      if (rawResponseCallback != null) {
+        rawResponseCallback(this.status, this.responseText)
+      }
       if (this.status == 200) {
         var taskList = new TaskList();
         jsonTasks = JSON.parse(this.responseText);
@@ -504,13 +543,16 @@ function collectTasks(url, taskCallback, doneCallback = null) {
 -----------------------------------------------------------------------
  collectTask - in use only in our tests, but gets one task from server
 ---------------------------------------------------------------------*/
-function collectTask(id, doneCallback) {
+function collectTask(id, doneCallback, rawResponseCallback = null) {
   if (doneCallback == null || id == null || id == "") {
     return false;
   }
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
+      if (rawResponseCallback != null) {
+        rawResponseCallback(this.status, this.responseText)
+      }
       if (this.status == 200) {
         var jsonTask = JSON.parse(this.responseText);
         task = taskJsonToJs(jsonTask);
@@ -526,13 +568,16 @@ function collectTask(id, doneCallback) {
 -----------------------------------------------------------------------
  collectTags - returns all the tags across all tasks (with counts)
 ---------------------------------------------------------------------*/
-function collectTags(doneCallback) {
+function collectTags(doneCallback, rawResponseCallback = null) {
   if (doneCallback == null) {
     return false;
   }
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
+      if (rawResponseCallback != null) {
+        rawResponseCallback(this.status, this.responseText)
+      }
       if (this.status == 200) {
         var jsonTags = JSON.parse(this.responseText);
         doneCallback(jsonTags);

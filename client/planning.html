@@ -46,6 +46,7 @@
 
 <!-- The following must be in order - look for a new tool to improve this -->
 <script src="pim-ajax.js"></script>
+<script src="pim-undo.js"></script>
 <script src="pim-task.js"></script>
 <script src="pim-tasklist.js"></script>
 <script src="pim-taskvue.js"></script>
@@ -59,7 +60,7 @@
 <div id="pim-root">
 
   <div>
-    <pim-navbar :items="nav" selected="Planning" />
+    <pim-navbar :items="nav" selected="Planning" @undo="undo" />
   </div>
 
   <div class="container-fluid">
@@ -108,13 +109,21 @@
 
 <script>
 
-// call the server to get tasks and put into the lists
-// loadTasksThisWeek();
-// loadTasksThisDay();
-loadPlanningTasks();
+function refreshPlanning() {
+  // call the server to get tasks and put into the lists
+  planninglist.empty()
+  loadPlanningTasks()
 
-// all the tags are loaded into global allTags
-tagsFindAll();
+  // all the tags are loaded into global allTags
+  while(allTags.length > 0) {
+    allTags.pop();
+  }  
+  tagsFindAll()
+}
+
+// initialize ourselves
+refreshPlanning()
+
 
 // here is a root Vue to hold references to my models
 // the data references can be linked to components
@@ -131,6 +140,13 @@ v = new Vue({
     nav: mainMenu,
     warnMessage: null,
     warnShow: false,
+    refreshNow: refreshNow, // trigger to force refresh of screen    
+  },
+  watch: {
+    // the rest of the app can force us to refresh by changing refreshNow
+    'refreshNow.i': function(oldVal, newVal) {
+      refreshPlanning()
+    }
   },
   methods: {
     modal: function(taskInfo) {
@@ -161,7 +177,10 @@ v = new Vue({
     },
     warnDismiss: function(visible) {
       this.warnShow = false
-    }
+    },
+    undo: function() {
+      cmdUndo() // execute undo on server
+    },    
   },
 })
 

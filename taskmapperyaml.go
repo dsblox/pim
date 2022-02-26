@@ -139,11 +139,13 @@ func (tm *TaskDataMapperYAML) saveTask(f *os.File, t *Task) error {
 var mu sync.Mutex
 func (tm *TaskDataMapperYAML) Save(t *Task, saveChildren bool, saveMyself bool) error {
 
+	// fmt.Println("tdmYAML.Save(): task = %s\b", t.GetName())
+
 	// mutex holds us here if a Save() is already in progress
 	mu.Lock()
 	defer mu.Unlock()
 
-	// log.Printf("Save(%t, %t): task = %s, id = %s, loaded = %t len(parentIds) = %d", saveChildren, saveMyself, t.name, t.id, tm.loaded, len(tm.parentIds))
+	// log.Printf("Save(%t, %t): task = %s, id = %s\n", saveChildren, saveMyself, t.name, t.id)
 
 	// open the file and clear it's contents if it exists
     f, err := os.Create(tm.fileName)
@@ -167,8 +169,9 @@ func (tm *TaskDataMapperYAML) Save(t *Task, saveChildren bool, saveMyself bool) 
 
 	// since we're about to change this (soon we'll have a tag
 	// identify the root) we'll just assume a single hierarchy
+	// this goes up the hierarchy until we get to the root parent
 	var root *Task = t
-	for root.HasParents() {
+	for root != nil && root.HasParents() {
 		root = root.FirstParent()
 	}
 	err = tm.saveTask(f, root);
@@ -305,7 +308,11 @@ func (tm *TaskDataMapperYAML) Load(t *Task, loadChildren bool, root bool) error 
 }
 
 // Delete is not supported on the YAML mapper - you can only save or load the entire task list
+// so we depend on the server being in the correct state and that we will write the entire
+// task list to the YAML file at the right times (for now, when tasks are added, changed, or
+// the server stops).  You could argue we only have to do it when the server stops.
 func (tm *TaskDataMapperYAML) Delete(t *Task, reparent *Task) error {
+	// return tm.Save(nil, true, true)
 	return nil
 }
 

@@ -186,7 +186,7 @@ func (list Tasks) FindTagMatches(tags []string, system bool) Tasks {
 			addit = curr.IsTagSet(tag)
 			if !addit && system && IsSystemTag(tag) {
 				if tag == "today" && curr.IsToday() {
-				    fmt.Printf("FindTagMatches(): tags = %v\n", tags)
+				  // fmt.Printf("FindTagMatches(): tags = %v\n", tags)
 					addit = true
 				}
 				if tag == "thisweek" && curr.IsThisWeek() {
@@ -201,7 +201,7 @@ func (list Tasks) FindTagMatches(tags []string, system bool) Tasks {
 			result = append(result, curr)
 		}
 	}
-	fmt.Printf("FindTagMatches(): len(result) = %v\n", len(result))
+	// fmt.Printf("FindTagMatches(): len(result) = %v\n", len(result))
 	return result	
 }
 
@@ -285,6 +285,57 @@ func NewTaskMemoryOnly(newName string) *Task {
 
 func (t *Task) MapperError() error {
 	return t.persist.Error()
+}
+
+func copyTime(t *time.Time) *time.Time {
+	if t != nil {
+		newTime := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+		return &newTime
+	} else {
+		return nil
+	}
+}
+
+// deep copy of a single task (does not recurse into children or parents)
+func (t *Task) Copy(target *Task) *Task {
+
+	// allow the function to work with a provided task or create one
+	var tTarget *Task
+	if target != nil {
+		tTarget = target
+	}	else {
+		tTarget = NewTask("")
+	}
+
+	// start with shallow copy
+	*tTarget = *t
+
+	// copy all the deep slice fields
+	if tTarget.tags != nil {
+		tTarget.tags = make([]string, len(t.tags))
+		copy(tTarget.tags, t.tags)
+	}
+	if tTarget.links != nil {
+		tTarget.links = make([]TaskLink, len(t.links))
+		copy(tTarget.links, t.links)
+	}
+	if tTarget.parents != nil {
+		tTarget.parents = make([]*Task, len(t.parents))
+		copy(tTarget.parents, t.parents)
+	}
+	if tTarget.kids != nil {
+		tTarget.kids = make([]*Task, len(t.kids))
+		copy(tTarget.kids, t.kids)
+	}
+
+	// copy all the deep struct pointer fields
+	tTarget.TargetStartTime 		 = copyTime(t.TargetStartTime)
+	tTarget.ActualStartTime 		 = copyTime(t.ActualStartTime)
+	tTarget.ActualCompletionTime = copyTime(t.ActualCompletionTime)
+
+	// TBD - catch errors and return nil on those
+
+	return tTarget
 }
 
 /* -- TBD - we may not need this - we can let the UI clone on its own
@@ -965,6 +1016,7 @@ func (t *Task) Parent() *Task {
 }
 
 func (t *Task) AddParent(p *Task) error {
+	// TBD: disallow adding nil parents?
 	t.parents = append(t.parents, p)
 	p.kids = append(p.kids, t)
 
@@ -1086,7 +1138,7 @@ func (t *Task) MoveBefore(list Tasks, target *Task) error {
 ===============================================================================*/
 func (t *Task) Save(saveChildren bool) error {
 
-	// log.Printf("Task.Save() id:%s, name:%s, memoryonly:%t\n", t.Id(), t.Name(), t.memoryonly)
+	// fmt.Printf("Task.Save() id:%s, name:%s, memoryonly:%t\n", t.GetId(), t.GetName(), t.memoryonly)
 
 	// if memory only and not saving children then nothing to do
 	if t.memoryonly && !saveChildren {
