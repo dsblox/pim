@@ -546,7 +546,7 @@ Vue.component('pim-task-list', {
     // one of my tasks has asked to be edited so ask my parent 
     // to show the modal with my list and the task to edit
     edittask: function(task) { 
-      this.$emit('modal', {task: task, list: this.taskList, tags: null});
+      this.$emit('modal', {task: task, list: this.taskList, tags: [this.systag]});
     },
     // my newtask button has been clicked
     newtask: function() {
@@ -819,6 +819,13 @@ Vue.component('pim-modal', {
       }
       this.strtags = "" // always clear the "add tags" box
 
+      /*
+      if (this.t.getName().length > 0) {
+        console.log("setting creating to " + (this.t.getName().length > 0) )
+        this.creating = false
+      }
+      */
+
       // make myself visible anytime i'm loaded
       $('#myModal').modal('show')      
     },
@@ -827,7 +834,6 @@ Vue.component('pim-modal', {
       this.strtags = ""
     },
     removetag: function(tag) { // remove from local copy - save will persist
-      console.log("modal: removetag "+ tag)
       this.t.removeTag(tag)
     }
   },
@@ -840,8 +846,8 @@ Vue.component('pim-modal', {
   },
   computed: {
     creating: function() { // controls appearance of delete button and title of box
-      return (this.t.name == null)
-    },
+       return (this.t.id == null)
+     },
     title: function() { // set the modal title based on whether a task was provided
       if (!this.creating) {
         return "Edit Task" //  + this.task.getName();

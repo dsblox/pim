@@ -263,8 +263,13 @@ function cmdUndo(rawResponseCallback = null) {
 /*
 -------------------------------------------------------------------------
  killTask()
+
+ Inputs:
+  * task                - JavaScript task object to be written to the server
+  * rawResponseCallback - callback allows caller to take an action
+  * refresh             - force page to refresh _after_ server responds 
 -----------------------------------------------------------------------*/
-function killTask(task, rawResponseCallback = null) {
+function killTask(task, rawResponseCallback = null, refresh = false) {
 
   // validate inputs that we have a task and a valid id
   var id = "";
@@ -286,6 +291,9 @@ function killTask(task, rawResponseCallback = null) {
       }
       else {
         console.log("failed: task not deleted http response: " + this.status);
+      }
+      if (refresh) {
+        forceRefresh()
       }
     }
   };
@@ -310,14 +318,15 @@ function killTask(task, rawResponseCallback = null) {
  which fields are to be set.  See updateTask() below for details.
 
  Inputs:
-  * task - JavaScript task object to be written to the server
-  * directiive - POST to create, PUT to replace, PATCH to update
+  * task      - JavaScript task object to be written to the server
+  * directive - POST to create, PUT to replace, PATCH to update
+  * refresh   - force page to refresh _after_ server responds
 
  TBD: Clean up the strange system-tag support that auto converts the 
       booleans into server tags.  I don't think it is needed anymore
       since we got rid of the booleans on the JS side!
 -----------------------------------------------------------------------*/
-function writeTask(task, directive, rawResponseCallback = null) {
+function writeTask(task, directive, rawResponseCallback = null, refresh = false) {
 
   if (task == null) {
     console.log("writeTask() error: null task provided");
@@ -366,6 +375,11 @@ function writeTask(task, directive, rawResponseCallback = null) {
           serverTask = JSON.parse(this.responseText);
           task.id = serverTask.id; 
         }
+
+        // refresh if requested
+        if (refresh) {
+          forceRefresh()
+        }
       }
       else {
         // console.log("writeTask: task create or updated failed.");
@@ -400,16 +414,16 @@ function writeTask(task, directive, rawResponseCallback = null) {
   * task.setTags[] - tags to write to the task on the server
   * task.resetTags[] = tags to turn OFF on the server
 -----------------------------------------------------------------------*/
-function updateTask(task, rawResponseCallback = null) {
-  writeTask(task, "PATCH", rawResponseCallback);
+function updateTask(task, rawResponseCallback = null, refresh = false) {
+  writeTask(task, "PATCH", rawResponseCallback, refresh);
 }
 
-function createTask(task, rawResponseCallback = null) {
-  writeTask(task, "POST", rawResponseCallback);
+function createTask(task, rawResponseCallback = null, refresh = false) {
+  writeTask(task, "POST", rawResponseCallback, refresh);
 }
 
-function replaceTask(task, rawResponseCallback = null) {
-  writeTask(task, "PUT", rawResponseCallback);
+function replaceTask(task, rawResponseCallback = null, refresh = false) {
+  writeTask(task, "PUT", rawResponseCallback, refresh);
 }
 
 

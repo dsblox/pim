@@ -39,15 +39,16 @@ var TaskCmd = {
 =========================================================================
  persistTask
 -------------------------------------------------------------------------
- Inputs: task  - the task to be persisted
-         cmdId - what to do with the task (default to UPSERT)
+ Inputs: task    - the task to be persisted
+         cmdId   - what to do with the task (default to UPSERT)
+         refresh - force page to refresh _after_ server responds
 
  This function was created when we were building an undo stack on the
  client, but kept even when we moved undo to the server because it
  seems useful to centralize all the ajax calls to persist a task to the
  server in one place.
 =======================================================================*/
-function persistTask(task, cmdId = TaskCmd.UPSERT) {
+function persistTask(task, cmdId = TaskCmd.UPSERT, refresh = false) {
 
   // handle upsert case where caller isn't sure of operation
   if (cmdId === TaskCmd.UPSERT) {
@@ -57,16 +58,16 @@ function persistTask(task, cmdId = TaskCmd.UPSERT) {
   // call the right persistence methos
   switch (cmdId) {
     case TaskCmd.CREATE: 
-      createTask(task)
+      createTask(task, null, refresh)
       break;
     case TaskCmd.REPLACE:
-      replaceTask(task)
+      replaceTask(task, null, refresh)
       break;
     case TaskCmd.UPDATE:
-      updateTask(task)
+      updateTask(task, null, refresh)
       break;
     case TaskCmd.DELETE:
-      killTask(task)
+      killTask(task, null, refresh)
       break;
     default:
       console.log("persistTask(): error - bad command id provided")
@@ -205,6 +206,17 @@ function toggleTag(tag) {
   }
 }
 
+function addTag(tag) {
+  if (allTags && allTags.length > 0) {
+    if (allTags.indexOf(tag) == -1) {
+      allTags.push(tag)
+    }
+  }
+}
+
+function refreshAllTags() {
+
+}
 
 /*
 =========================================================================
@@ -235,13 +247,19 @@ function modalTaskSave(modalTask, list, sysTags) {
     // hrm - we eat any errors if the tag can't be set!
   }
 
-  // write the task to the server and handle undo stack
-  persistTask(t, TaskCmd.UPSERT)
+  // write the task to the server and refresh the page
+  // refresh only needed to keep tag-bar up to date (see TBD below)
+  persistTask(t, TaskCmd.UPSERT, true)
 
   // add the task to the list the modal wants to use
   if (list != null) {
     list.insertTask(t)
   }
+
+  // TBD: somehow dynamically bind the list of allTags to the tags 
+  // actually on each task so that removing "the last" tag from a 
+  // task in the UI will automatically remove the tag from the tagbar
+  // without an expensive refresh
 
   return t;
 }
@@ -277,8 +295,15 @@ function deleteTask(task) {
 		return;
 	}
 
-  // save the task and handle undo
-  persistTask(task, TaskCmd.DELETE)
+  // save the task and handle undo - note the "true" is to force
+  // a refresh which is necessary only to make sure the tag bar
+  // refreshes if needed based on this deletion.  See TBD below.
+  persistTask(task, TaskCmd.DELETE, true)
+
+  // TBD: somehow dynamically bind the list of allTags to the tags 
+  // actually on each task so that removing "the last" tag from a 
+  // task in the UI will automatically remove the tag from the UI 
+  // without an expensive refresh
 }
 
 
@@ -612,6 +637,16 @@ function tagsDoneFinding(mapTags) {
   aTags = Object.entries(mapTags)
   aTags.sort(function(a,b){b[1]-a[1]})
   aTags.map(function(e){allTags.push(e[0])})
+
+  // deslect any selected tags that no longer exist
+  // (can happen if page refreshes and last tag(s) removed)
+  const prevSelected = selectedTags.slice()
+  prevSelected.forEach(function(s) {
+    if(allTags.indexOf(s) == -1) {
+      deselectTag(s)
+    }
+  })
+
 }
 function tagsFindAll() {
   collectTags(tagsDoneFinding)
