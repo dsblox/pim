@@ -86,6 +86,7 @@ function timeToForm(date) {
   * tasksCompleteURL - finds all complete tasks in the system
   * tasksFindURL - finds all tasks at a certain date
   * undoURL - calls the server to undo the most recent action
+  * signinURL - calls the server to signin
 ========================================================================*/
 // we should find a way to make this more dynamic
 var baseURL = "https://localhost:4000/";
@@ -105,6 +106,14 @@ function serverStatusURL() {
 
 function undoURL() {
   return makeURL("undo")
+}
+
+function signinURL() {
+  return makeURL("signin")
+}
+
+function signupURL() {
+  return makeURL("signup")
 }
 
 function tasksURL(id = "") {
@@ -241,6 +250,57 @@ function cmdUndo(rawResponseCallback = null) {
     }
   };
   ajaxGet(ajax, undoURL());    
+}
+
+/*
+=========================================================================
+ userAuth
+ userSignin
+ userSignUp
+-------------------------------------------------------------------------
+ Call server to authenticate or add a new user.  Someday will return an
+ auth token that we'll need to store on the client and include in all
+ future API calls.
+========================================================================*/
+function userAuth(url, email, password, rawResponseCallback = null) {
+  ajax = ajaxObj();
+  ajax.onreadystatechange = function() {
+    if (this.readyState == 4) {
+      if (rawResponseCallback != null) {
+        rawResponseCallback(this.status, this.responseText)
+      }      
+      if (this.status == 200) {
+        responseInfo = JSON.parse(this.responseText);
+        if (responseInfo) {
+          if (responseInfo.code != 0) {
+            pimShowError(responseInfo.msg)
+          }
+          else {
+            window.location = "vuepim.html" 
+          }
+        }
+      }
+      else {
+        responseInfo = JSON.parse(this.responseText);
+        if (responseInfo) {
+          pimShowError(responseInfo.msg)
+        }
+        else {
+          pimShowError("Error: HTTP status <" + this.status + "> returned")
+        }
+      }
+    }
+  }
+  creds = { email:email, password:password }
+  ajaxPayload(ajax, url, creds, "POST")  
+}
+
+function userSignin(email, password, rawResponseCallback = null) {
+  userAuth(signinURL(), email, password, rawResponseCallback)
+}
+
+function userSignup(email, password, rawResponseCallback = null) {
+    userAuth(signupURL(), email, password, rawResponseCallback)
 }
 
 /*

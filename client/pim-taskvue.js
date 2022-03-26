@@ -942,8 +942,7 @@ Vue.component('pim-modal', {
          selected - display name of the item that should be active
          
  Display the nav bar which today just navigates to all the new pages
- and does nothing on login.  TBD: emit events so the parent can
- actually navigate and so other things like login / logout.
+ and provides access to undo and logout functions.
 ====================================================================*/
 Vue.component('pim-navitem', {
   props: ['name', 'target', 'selected'],
@@ -957,6 +956,9 @@ Vue.component('pim-navbar', {
   methods: {
     undo: function() { 
       this.$emit('undo')
+    },
+    logout: function() {
+      this.$emit('logout')
     },
   },  
   template: ' \
@@ -974,10 +976,7 @@ Vue.component('pim-navbar', {
                       <a class="nav-link" href="#" @click="undo"><span class="fa fa-undo"></span> Undo</a> \
                     </li> \
                     <li class="nav-item"> \
-                      <a class="nav-link" href="#"><span class="fa fa-user"></span> Sign Up</a> \
-                    </li> \
-                    <li class="nav-item"> \
-                      <a class="nav-link" href="#"><span class="fa fa-sign-in"></span> Login</a> \
+                      <a class="nav-link" href="#" @click="logout"><span class="fa fa-sign-out"></span> Logout</a> \
                     </li> \
                   </ul> \
                 </div> \

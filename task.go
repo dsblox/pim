@@ -95,8 +95,11 @@ type Task struct {
 	tags []string 									// all the things - for now today, thisweek, dontforget
 	links []TaskLink 								// a task can have associated links
 
-	parents []*Task      // list of parent tasks (we support many parents)
-	kids []*Task         // list of child tasks
+	parents []*Task      						// list of parent tasks (we support many parents)
+	kids []*Task         						// list of child tasks
+
+	users []*User                   // list of users who can see this task (TBD: different permissions)
+
 
 	// for console app only!  hopefully won't need in the end
 	current bool  // need to get rid of this

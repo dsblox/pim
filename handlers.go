@@ -131,12 +131,20 @@ type CmdJSON struct {
 
 func errorResponse(w http.ResponseWriter, e PimError) {
     w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-    w.WriteHeader(e.Response) // file not found - is this right for not finding the id?
+    w.WriteHeader(e.Response)
     if err := json.NewEncoder(w).Encode(e); err != nil {
         panic(err)
     }
 }
 
+func successResponse(w http.ResponseWriter) {
+    payload := pimSuccess()
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    w.WriteHeader(payload.Response)
+    if err := json.NewEncoder(w).Encode(payload); err != nil {
+        panic(err)
+    }    
+}
 
 
 // these are all testing using repo.go instead of our
@@ -610,3 +618,168 @@ func Undo(w http.ResponseWriter, r *http.Request) {
         panic(err)
     }
 }
+
+
+/*
+==============================================================================
+ UserSetAuthToken()
+------------------------------------------------------------------------------
+ Inputs: w        ResponseWriter - response to write results / cookie into
+         username string         - username whose password is already ok-ed
+
+ Errors: This function returns no errors.  It either writes an error to the
+         response or it sets the cookie and assumes its caller doesn't care.
+
+ Takes care of the "http" level of signing in with an authentication token.
+ This function also decides on the length of the token (TBD move into JWT
+ code somehow).
+============================================================================*/
+func userSetAuthToken(w http.ResponseWriter, username string) {
+
+    // get a JWT token for this user that expires in 5 minutes
+    expirationTime := time.Now().Add(5 * time.Minute)
+    tokenString, err := UserGetAuthToken(username, expirationTime)
+    if err != nil {
+        // if there is an error in creating the JWT return an internal server error
+        errorResponse(w, pimErr(authErr))        
+        return
+    }
+
+    // set the client cookie for "token" as the JWT we just generated
+    // we also set an expiry time which is the same as the token itself
+    http.SetCookie(w, &http.Cookie{
+        Name:    "token",
+        Value:   tokenString,
+        Expires: expirationTime,
+    })    
+}
+
+/*
+==============================================================================
+ UserCheckAuthToken()
+------------------------------------------------------------------------------
+ Inputs:  w  ResponseWriter - response to write results / errors into
+          r  Request        - request holding the cookie with the token
+ Returns: string            - username from the token or nill if error
+ Errors: This function returns no errors.  It either writes an error to the
+         response or it returns a successfully decoded username.
+
+ Takes care of the "http" level of authenticating a user request.  It is
+ intended to call this method on every request to identify and authenticate
+ the user.
+============================================================================*/
+func userCheckAuthToken(w http.ResponseWriter, r *http.Request) string {
+
+    // obtain the session token from the request cookies
+    c, err := r.Cookie("token")
+    if err != nil {
+        if err == http.ErrNoCookie {
+            // if the cookie is not set, return an unauthorized status
+            errorResponse(w, pimErr(authNoToken))
+            return ""
+        }
+        // for any other type of error, return a bad request status
+        errorResponse(w, pimErr(badRequest))
+        return ""
+    }
+
+    // get the JWT string from the cookie
+    tknStr := c.Value
+
+    // validate the token and set http responses properly
+    var username string
+    var errCode PimErrId
+    username, errCode = UserValidateAuthToken(tknStr)
+    if (err != nil) {
+        errorResponse(w, pimErr(errCode)) // this may need to be typed to pimErr
+        return ""
+    }
+    return username
+}
+
+/*
+==============================================================================
+ UserSignup()
+------------------------------------------------------------------------------
+ Create a new user and automatically sign them in by returning an
+ authentication token.
+============================================================================*/
+func UserSignup(w http.ResponseWriter, r *http.Request) {
+    fmt.Printf("UserSignup(): entry\n")
+
+    var creds UserCredentials
+    // Get the JSON body and decode into credentials
+    err := json.NewDecoder(r.Body).Decode(&creds)
+    if err != nil {
+        // the structure of the body is wrong
+        errorResponse(w, pimErr(badRequest))
+        return
+    }
+
+    // make sure the email address doesn't already exist
+    prev := users.FindByEmail(creds.Email)
+    if prev != nil {
+        errorResponse(w, pimErr(authTaken))
+        return
+    }
+
+    // create the new user - may not create if email is invalid
+    // or password is not up to standard
+    noob, errCreate := NewUser("unspecified", creds.Email, creds.Password)
+    if errCreate != success {
+        errorResponse(w, pimErr(errCreate))
+        return        
+    }
+
+    // add the new user to the global list (move inside the object?)
+    users = append(users, noob)
+
+    // for now output the id of the user created to allow us to compile
+    fmt.Printf("UserCreate(): created user:%s\n", noob)
+
+    // now we have a valid user - return credentials to the client
+    userSetAuthToken(w, creds.Email)
+    successResponse(w)
+}
+
+/*
+==============================================================================
+ UserSignin()
+------------------------------------------------------------------------------
+ Sign the user into the system by validating credentials that are expected
+ in the request and - if the credentials are valid - putting an authentication
+ token into the response that the client can reuse on future requests.
+============================================================================*/
+func UserSignin(w http.ResponseWriter, r *http.Request) {
+    fmt.Printf("UserSignin(): entry\n")
+
+    // get the JSON body and decode into credentials
+    var creds UserCredentials
+    err := json.NewDecoder(r.Body).Decode(&creds)
+    if err != nil {
+        // the structure of the body is wrong
+        errorResponse(w, pimErr(badRequest))
+        return
+    }
+
+    // we do the success case in one place here, when the
+    // username and password are good, set the auth token
+    // into the response
+    user := users.FindByEmail(creds.Email)
+    if user != nil {
+        expectedPassword := user.GetPassword()
+        if expectedPassword == creds.Password {
+            userSetAuthToken(w, creds.Email)
+            successResponse(w)        
+            return
+        }
+    }
+
+    // note that we do not want to leak any username info so it is important
+    // to return the identical error when the username doesn't exist and when
+    // the password is bad, so we make sure to return the error in one place.
+    // if we arrived here then one of those auth errors occurred
+    errorResponse(w, pimErr(authFail))
+    return
+}
+

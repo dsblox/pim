@@ -58,7 +58,7 @@
 <div id="pim-root">
 
   <div>
-    <pim-navbar :items="nav" selected="Home" @undo="undo()"/>
+    <pim-navbar :items="nav" selected="Home" @undo="undo()" @logout="logout()"/>
   </div>
 
   <div class="container-fluid">
@@ -148,6 +148,7 @@ v = new Vue({
     modalTask: null,
     modalList: todaylist,
     modalTags: null,
+    signinWhich: null,
     all: todaylist,
     dragListTitle: null,
     nav: mainMenu,
@@ -230,6 +231,10 @@ v = new Vue({
     },
     undo: function() {
       cmdUndo() // execute undo on server
+    },
+    logout: function() {
+      // call server soon to invalidate login token?
+      window.location = "index.html"
     }
   },
 })

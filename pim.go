@@ -292,8 +292,15 @@ func runConsoleApp(dbName string) {
 var master *Task
 var commands *commandHistory
 
+var users Users
+
 func runServerApp(port string, files string, certs string, dbName string) {
-	log.Printf("Will run as server soon\n")	
+	log.Printf("Will run as server soon\n")
+
+	// for now auto-create one user - the admin
+	// TBD: make users a real thing
+	admin, _ := NewUser("admin", "dblock@alumni.brown.edu", "insecure")
+	users = append(users, admin)
 
 	// initialize a master task (in global for now)
 	// that knows how to map to a database or YAML file

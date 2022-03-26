@@ -27,6 +27,20 @@ var queryTags = []string{"tags", "{tags}"}
 
 var routes = Routes{
     Route{
+        Name: "Signin",
+        Method: "POST",
+        Pattern: "/signin",
+        Queries: []string{"email", "{email}", "password", "{password}"},
+        HandlerFunc: UserSignin,
+    },
+    Route{
+        Name: "Signup",
+        Method: "POST",
+        Pattern: "/signup",
+        Queries: []string{"email", "{email}", "password", "{password}"},
+        HandlerFunc: UserSignup,
+    },
+    Route{
         Name: "TaskIndex",
         Method: "GET",
         Pattern: "/tasks",

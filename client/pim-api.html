@@ -30,6 +30,7 @@
         <button type="button" class="btn btn-primary" onclick="apiLoadTags()">List Tags</button>
         <button type="button" class="btn btn-primary" onclick="apiFindDates()">Search</button>
         <button type="button" class="btn btn-primary" onclick="apiUndo()">Undo</button>
+        <button type="button" class="btn btn-primary" onclick="apiSignin()">Signin</button>
         <div id="list">
         </div>
         </div>
@@ -361,6 +362,11 @@ function apiDeleteTask() {
 function apiUndo() {
   console.log("pim-api: apiUndo()")
   cmdUndo(displayRawResponse)
+}
+
+function apiSignin() {
+  console.log("pim-api: apiSignin()")
+  userSignin("dblock@alumni.brown.edu", "insecure") 
 }
 
 </script>
