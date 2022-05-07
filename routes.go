@@ -18,12 +18,17 @@ type Route struct {
     Pattern     string
     Queries     []string
     HandlerFunc http.HandlerFunc
+    NoAuth      bool
 }
 
 type Routes []Route
 
-// i reuse this alot so put it here
-var queryTags = []string{"tags", "{tags}"}
+// this is for temporary use while i develop user functionality
+// to allow me to see tasks for all users at once
+var queryIgnoreUsers = []string{"ignoreusers", "{ignoreusers}"}
+
+// i reuse this alot so put it here (temporarily added ignore users for convenience while I support it)
+var queryTags = []string{"tags", "{tags}", "ignoreusers", "{ignoreusers}"}
 
 var routes = Routes{
     Route{
@@ -32,6 +37,7 @@ var routes = Routes{
         Pattern: "/signin",
         Queries: []string{"email", "{email}", "password", "{password}"},
         HandlerFunc: UserSignin,
+        NoAuth: true,
     },
     Route{
         Name: "Signup",
@@ -39,6 +45,13 @@ var routes = Routes{
         Pattern: "/signup",
         Queries: []string{"email", "{email}", "password", "{password}"},
         HandlerFunc: UserSignup,
+        NoAuth: true,
+    },
+    Route{
+        Name: "SignReup",
+        Method: "POST",
+        Pattern: "/signreup",
+        HandlerFunc: UserSignReup,
     },
     Route{
         Name: "TaskIndex",
@@ -72,7 +85,7 @@ var routes = Routes{
         Name: "TaskGeneralFind",
         Method: "GET",
         Pattern: "/tasks/find",
-        Queries: []string{"fromDate", "{date}", "toDate", "{date}"},
+        Queries: append([]string{"fromDate", "{date}", "toDate", "{date}"}, queryIgnoreUsers...),
         HandlerFunc: TaskGeneralFind,
     }, 
     Route{
@@ -99,24 +112,28 @@ var routes = Routes{
         Name: "TaskReplace",
         Method: "PUT",
         Pattern: "/tasks/{taskId}",
+        Queries: queryIgnoreUsers,
         HandlerFunc: TaskReplace,
     },
     Route{
         Name: "TaskUpdate",
         Method: "PATCH",
         Pattern: "/tasks/{taskId}",
+        Queries: queryIgnoreUsers,
         HandlerFunc: TaskUpdate,
     },
     Route{
         Name: "TaskDelete",
         Method: "DELETE",
         Pattern: "/tasks/{taskId}",
+        Queries: queryIgnoreUsers,
         HandlerFunc: TaskDelete,
     },
     Route{
         Name: "TagIndex",
         Method: "GET",
         Pattern: "/tags",
+        Queries: queryIgnoreUsers,
         HandlerFunc: TagIndex,
     },
     Route{
@@ -137,4 +154,5 @@ var routes = Routes{
         Method: "GET",
         Pattern: "/status",
         HandlerFunc: ServerStatus,
+        NoAuth: true,
     },}

@@ -23,161 +23,160 @@
 
 </head>
 <body>
-   <div id="pim-root">
-   <section class="ftco-section">
+  <div id="pim-root">
+    <section class="ftco-section">
       <div class="container" id="signin">
-         <div class="row justify-content-center">
-            <div class="col-md-6 text-center mb-5">
-               <h2 class="heading-section">Perfect PIM</h2>
-            </div>
-         </div>
-         <div class="row justify-content-center">
-            <div class="col-md-12 col-lg-10">
-               <div class="wrap d-md-flex">
-                  <div class="img" style="background-image: url(cleandesk.jpg);">
-               </div>
-                  <div class="login-wrap p-4 p-md-5">
-                  <div class="d-flex">
-                     <div class="w-100">
-                        <h3 class="mb-4">Sign In</h3>
-                     </div>
-                        <div class="w-100">
-                           <p class="social-media d-flex justify-content-end">
-                              <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-facebook"></span></a>
-                              <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-twitter"></span></a>
-                           </p>
-                        </div>
+        <div class="row justify-content-center">
+          <div class="col-md-6 text-center mb-5">
+            <h2 class="heading-section">Perfect PIM</h2>
+          </div>
+        </div>
+        <div class="row justify-content-center">
+          <div class="col-md-12 col-lg-10">
+            <div class="wrap d-md-flex">
+              <div class="img" style="background-image: url(cleandesk.jpg);">
+              </div>
+              <div class="login-wrap p-4 p-md-5">
+                <div class="d-flex">
+                  <div class="w-100">
+                    <h3 class="mb-4">Sign In</h3>
                   </div>
-                     <form action="#" class="signin-form">
-                     <div class="form-group mb-3">
-                        <label class="label" for="name">Email</label>
-                        <input id="email" type="text" class="form-control" placeholder="Email" required>
-                     </div>
+                  <div class="w-100">
+                    <p class="social-media d-flex justify-content-end">
+                      <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-facebook"></span></a>
+                      <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-twitter"></span></a>
+                    </p>
+                  </div>
+                </div>
+                <form action="#" class="signin-form" @submit.prevent="signin">
                   <div class="form-group mb-3">
-                     <label class="label" for="password">Password</label>
+                    <label class="label" for="name">Email</label>
+                    <input id="email" type="text" class="form-control" placeholder="Email" required>
+                  </div>
+                  <div class="form-group mb-3">
+                    <label class="label" for="password">Password</label>
                     <input id="password" type="password" class="form-control" placeholder="Password" required>
                   </div>
                   <div class="form-group">
-                     <button type="submit" class="form-control btn btn-primary rounded submit px-3" onclick="signin()">Sign In</button>
+                    <button class="form-control btn btn-primary rounded submit px-3">Sign In</button>
                   </div>
                   <div class="form-group d-md-flex">
-                     <div class="w-50 text-left">
-                        <label class="checkbox-wrap checkbox-primary mb-0">Remember Me
-                             <input type="checkbox" checked>
-                             <span class="checkmark"></span>
-                              </label>
-                           </div>
-                           <div class="w-50 text-md-right">
-                              <a href="#">Forgot Password</a>
-                           </div>
+                    <div class="w-50 text-left">
+                      <label class="checkbox-wrap checkbox-primary mb-0">Remember Me
+                        <input type="checkbox" checked>
+                        <span class="checkmark"></span>
+                      </label>
+                    </div>
+                    <div class="w-50 text-md-right">
+                      <a href="#">Forgot Password</a>
+                    </div>
                   </div>
                 </form>
                 <p class="text-center">Need an account? <a data-toggle="tab" href="#signup" onclick="toggle('signup','signin')">Sign Up</a></p>
               </div>
             </div>
-            </div>
-         </div>
+          </div>
+        </div>
       </div>
       <div class="container" id="signup" style="visibility: hidden">
-         <div class="row justify-content-center">
-            <div class="col-md-6 text-center mb-5">
-               <h2 class="heading-section">Perfect PIM Sign-Up</h2>
-            </div>
-         </div>
-         <div class="row justify-content-center">
-            <div class="col-md-12 col-lg-10">
-               <div class="wrap d-md-flex">
-                  <div class="img" style="background-image: url(cleandesk.jpg);">
-               </div>
-                  <div class="login-wrap p-4 p-md-5">
-                  <div class="d-flex">
-                     <div class="w-100">
-                        <h3 class="mb-4">Sign Up</h3>
-                     </div>
-                        <div class="w-100">
-                           <p class="social-media d-flex justify-content-end">
-                              <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-facebook"></span></a>
-                              <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-twitter"></span></a>
-                           </p>
-                        </div>
+        <div class="row justify-content-center">
+          <div class="col-md-6 text-center mb-5">
+            <h2 class="heading-section">Perfect PIM Sign-Up</h2>
+          </div>
+        </div>
+        <div class="row justify-content-center">
+          <div class="col-md-12 col-lg-10">
+            <div class="wrap d-md-flex">
+              <div class="img" style="background-image: url(cleandesk.jpg);">
+              </div>
+              <div class="login-wrap p-4 p-md-5">
+                <div class="d-flex">
+                  <div class="w-100">
+                    <h3 class="mb-4">Sign Up</h3>
                   </div>
-                     <form action="#" class="signin-form">
-                     <div class="form-group mb-3">
-                        <label class="label" for="name">Email</label>
-                        <input id="signupemail" type="text" class="form-control" placeholder="Email" required>
-                     </div>
+                  <div class="w-100">
+                    <p class="social-media d-flex justify-content-end">
+                      <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-facebook"></span></a>
+                      <a href="#" class="social-icon d-flex align-items-center justify-content-center"><span class="fa fa-twitter"></span></a>
+                    </p>
+                  </div>
+                </div>
+                <form action="#" class="signin-form" @submit.prevent="signup">
                   <div class="form-group mb-3">
-                     <label class="label" for="password">Password</label>
+                    <label class="label" for="name">Email</label>
+                    <input id="signupemail" type="text" class="form-control" placeholder="Email" required>
+                  </div>
+                  <div class="form-group mb-3">
+                    <label class="label" for="password">Password</label>
                     <input id="signuppw1" type="password" class="form-control" placeholder="Password" required>
                   </div>
                   <div class="form-group mb-3">
-                     <label class="label" for="password">Password Again</label>
+                    <label class="label" for="password">Password Again</label>
                     <input id="signuppw2" type="password" class="form-control" placeholder="Password" required>
                   </div>
                   <div class="form-group">
-                     <button type="submit" class="form-control btn btn-primary rounded submit px-3" onclick="signup()">Sign Up</button>
+                    <button class="form-control btn btn-primary rounded submit px-3">Sign Up</button>
                   </div>
                 </form>
                 <p class="text-center">Already have an account? <a data-toggle="tab" href="#signup" onclick="toggle('signin','signup')">Sign In</a></p>
               </div>
             </div>
-            </div>
-         </div>
+          </div>
+        </div>
       </div>
-      <div>
-       <pim-alert :message="warnMessage" :show="warnShow" @dismiss="warnDismiss" /> 
-      </div>      
-   </section>
-   </div>
+    <div>
+    <pim-alert :message="warnMessage" :show="warnShow" @dismiss="warnDismiss" /> 
+  </div>      
+  </section>
+</div>
 
-   <script>
-      function toggle(on, off) {
-         document.getElementById(on).style.visibility = "visible"
-         document.getElementById(off).style.visibility = "hidden"
-         document.getElementById(on).style.display = "inline"
-         document.getElementById(off).style.display = "none"
-      }
-      function signin() {
-         let email    = document.getElementById("email").value
-         let password = document.getElementById("password").value
-         console.log("signin()")
-         userSignin(email, password)
-         // TBD - forgot password functionality
-         // TBD - integrate into vue.js (why???)
-      }
-      function signup() {
-         let email    = document.getElementById("signupemail").value
-         let password = document.getElementById("signuppw1").value
-         console.log("signup()")
-         userSignup(email, password)
-         // TBD - check that passwords match!
-         // TBD - integrate into vue.js (why???)
-      }
+ <script>
+    function toggle(on, off) {
+       document.getElementById(on).style.visibility = "visible"
+       document.getElementById(off).style.visibility = "hidden"
+       document.getElementById(on).style.display = "inline"
+       document.getElementById(off).style.display = "none"
+    }
 
-      // here is a root Vue to hold references to my models
-      // the data references can be linked to components
-      v = new Vue({
-        el: '#pim-root',
-        data: {
-          warnMessage: null,
-          warnShow: false, // note: could not get vue reactive directly
+    // here is a root Vue to hold references to my models
+    // the data references can be linked to components
+    v = new Vue({
+      el: '#pim-root',
+      data: {
+        warnMessage: null,
+        warnShow: false, // note: could not get vue reactive directly
+      },
+      methods: {
+        signin() {
+          let email    = document.getElementById("email").value
+          let password = document.getElementById("password").value
+          userSignin(email, password)
+          // TBD - forgot password functionality
+          // TBD - collect form elements using vue bindings (why???)
         },
-        methods: {
-          warn: function(message) {
-            this.warnMessage = message
-            this.warnShow = true
-          },
-          warnDismiss: function(visible) {
-            this.warnShow = false
-          },
+        signup() {
+          let email    = document.getElementById("signupemail").value
+          let password = document.getElementById("signuppw1").value
+          userSignup(email, password)
+          // TBD - check that passwords match!
+          // TBD - collect form elements using vue bindings (why???)
         },
-      })      
-   </script>
+        warn: function(message) {
+          this.warnMessage = message
+          this.warnShow = true
+        },
+        warnDismiss: function(visible) {
+          this.warnShow = false
+        },
+      },
+    })      
 
-   <script src="jquery/3.4.1/jquery-3.4.1.slim.min.js"></script>
-   <script src="popper/1.16.0/popper.min.js"></script>
-   <script src="bootstrap/4.4.1/js/bootstrap.min.js"></script>  
-   <script src="fontawesome/041d5ecc63.js"></script>    
+ </script>
+
+ <script src="jquery/3.4.1/jquery-3.4.1.slim.min.js"></script>
+ <script src="popper/1.16.0/popper.min.js"></script>
+ <script src="bootstrap/4.4.1/js/bootstrap.min.js"></script>  
+ <script src="fontawesome/041d5ecc63.js"></script>  
 
 </body>
 </html>

@@ -28,6 +28,13 @@ function pimAjaxError(response) {
   }
 }
 
+// utility function to check for unauthorized response
+function pimAuthCheck(status) {
+  if (status == 401) { // stop everything on unauthorized
+    window.location = "index.html"         
+  }
+}
+
 // set local to true to convert date to local timezone
 // typically we want them in the local time zone when we are in weekly / daily views
 // and we want them in UTC in historical views - though perhaps we should change that?
@@ -97,6 +104,13 @@ function makeURL(cmd, tags = null) {
     // hrm - those tags better not already have a comma in them
     params = "?tags=" + tags.join(",");
   }
+
+  // temporary - always ignore users if requested
+  if (ignoreusers) {
+    params += (params.length > 0 ? "&" : "?")
+    params += "ignoreusers=true"
+  }
+
   return baseURL + cmd + params;
 }
 
@@ -114,6 +128,10 @@ function signinURL() {
 
 function signupURL() {
   return makeURL("signup")
+}
+
+function signreupURL() {
+  return makeURL("signreup")
 }
 
 function tasksURL(id = "") {
@@ -189,6 +207,7 @@ function reorderTask(move, before) {
   ajax = ajaxObj()
   ajax.onreadystatechange = function() {  
     if (this.readyState == 4) {
+      pimAuthCheck(this.status) // redirects on auth failure            
       if (this.status == 200) {
         console.log("success: reorder succeeded")
       }
@@ -232,7 +251,8 @@ function cmdUndo(rawResponseCallback = null) {
     if (this.readyState == 4) {
       if (rawResponseCallback != null) {
         rawResponseCallback(this.status, this.responseText)
-      }      
+      }
+      pimAuthCheck(this.status) // redirects on auth failure         
       if (this.status == 200) {
         let response = JSON.parse(this.responseText)
         if (response && response.code == 4) {
@@ -257,12 +277,12 @@ function cmdUndo(rawResponseCallback = null) {
  userAuth
  userSignin
  userSignUp
+ userSignReup
 -------------------------------------------------------------------------
- Call server to authenticate or add a new user.  Someday will return an
- auth token that we'll need to store on the client and include in all
- future API calls.
+ Call server to authenticate or add a new user.  Tokens are automatically
+ set into a cookie.
 ========================================================================*/
-function userAuth(url, email, password, rawResponseCallback = null) {
+function userAuth(url, email, password, redirectAuth, redirectFail, rawResponseCallback = null) {
   ajax = ajaxObj();
   ajax.onreadystatechange = function() {
     if (this.readyState == 4) {
@@ -274,9 +294,12 @@ function userAuth(url, email, password, rawResponseCallback = null) {
         if (responseInfo) {
           if (responseInfo.code != 0) {
             pimShowError(responseInfo.msg)
+            if (redirectFail != null) {
+              window.location = redirectFail
+            }
           }
-          else {
-            window.location = "vuepim.html" 
+          else if (redirectAuth != null) {
+            window.location = redirectAuth 
           }
         }
       }
@@ -284,6 +307,9 @@ function userAuth(url, email, password, rawResponseCallback = null) {
         responseInfo = JSON.parse(this.responseText);
         if (responseInfo) {
           pimShowError(responseInfo.msg)
+          if (redirectFail != null) {
+            window.location = redirectFail
+          }
         }
         else {
           pimShowError("Error: HTTP status <" + this.status + "> returned")
@@ -296,11 +322,15 @@ function userAuth(url, email, password, rawResponseCallback = null) {
 }
 
 function userSignin(email, password, rawResponseCallback = null) {
-  userAuth(signinURL(), email, password, rawResponseCallback)
+  userAuth(signinURL(), email, password, "vuepim.html", null, rawResponseCallback)
 }
 
 function userSignup(email, password, rawResponseCallback = null) {
-    userAuth(signupURL(), email, password, rawResponseCallback)
+  userAuth(signupURL(), email, password, "vuepim.html", null, rawResponseCallback)
+}
+
+function userSignReup(rawResponseCallback = null) {
+  userAuth(signreupURL(), null, null, null, "index.html", rawResponseCallback)  
 }
 
 /*
@@ -345,11 +375,15 @@ function killTask(task, rawResponseCallback = null, refresh = false) {
     if (this.readyState == 4) {
       if (rawResponseCallback != null) {
         rawResponseCallback(this.status, this.responseText)
-      }      
-      if (this.status == 200) {
-        console.log("success: task deleted");
       }
-      else {
+      pimAuthCheck(this.status) // redirects on auth failure      
+      if (this.status != 200) {
+        responseInfo = JSON.parse(this.responseText);
+        if (responseInfo) {
+          if (responseInfo.code != 0) {
+            pimShowError(responseInfo.msg)
+          }
+        }
         console.log("failed: task not deleted http response: " + this.status);
       }
       if (refresh) {
@@ -426,7 +460,8 @@ function writeTask(task, directive, rawResponseCallback = null, refresh = false)
     if (this.readyState == 4) {
       if (rawResponseCallback != null) {
         rawResponseCallback(this.status, this.responseText)
-      }      
+      }
+      pimAuthCheck(this.status) // redirects on auth failure      
       if (this.status == 200 || this.status == 201) {
         // console.log("success: task created or updated");
 
@@ -571,6 +606,7 @@ function collectTasks(url, taskCallback, doneCallback = null, rawResponseCallbac
       if (rawResponseCallback != null) {
         rawResponseCallback(this.status, this.responseText)
       }
+      pimAuthCheck(this.status) // redirects on auth failure
       if (this.status == 200) {
         var taskList = new TaskList();
         jsonTasks = JSON.parse(this.responseText);
@@ -603,6 +639,7 @@ function collectTasks(url, taskCallback, doneCallback = null, rawResponseCallbac
         if (doneCallback != null) {
           doneCallback(null);
         }
+
         // if we got an empty list, let's ask the server for it's status to
         // see if there is a better explanation besides "empty list"
         // that we share with the user.
@@ -627,6 +664,7 @@ function collectTask(id, doneCallback, rawResponseCallback = null) {
       if (rawResponseCallback != null) {
         rawResponseCallback(this.status, this.responseText)
       }
+      pimAuthCheck(this.status) // redirects on auth failure      
       if (this.status == 200) {
         var jsonTask = JSON.parse(this.responseText);
         task = taskJsonToJs(jsonTask);
@@ -652,6 +690,7 @@ function collectTags(doneCallback, rawResponseCallback = null) {
       if (rawResponseCallback != null) {
         rawResponseCallback(this.status, this.responseText)
       }
+      pimAuthCheck(this.status) // redirects on auth failure            
       if (this.status == 200) {
         var jsonTags = JSON.parse(this.responseText);
         doneCallback(jsonTags);

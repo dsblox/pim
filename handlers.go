@@ -7,13 +7,26 @@ import (
     "io/ioutil"
     "fmt"
     "time"
-    "log"
     "strings"
-    // "errors"
-
     "github.com/gorilla/mux"
 )
 
+// TEMPORARY way to allow all tasks to be owned by one user while developing user behavior
+func UserIfOn(w http.ResponseWriter, r *http.Request) *User {
+    // TEMPORARY while we develop to easily turn multiuser functionality on / off
+
+    // pull url parameter to ignore current user
+    vars := mux.Vars(r)
+    _, ignoreUsers := vars["ignoreusers"]
+
+    // if ignoring users don't get the user
+    if ignoreUsers {
+        return nil
+    }
+
+    // the usual case is this just wraps UserFromRequest
+    return UserFromRequest(w, r)
+}
 
 // Task: our central type for the whole world here - will become quite large over time
 type TaskJSON struct {
@@ -146,7 +159,6 @@ func successResponse(w http.ResponseWriter) {
     }    
 }
 
-
 // these are all testing using repo.go instead of our
 // real tasks objects.  Next step is to hook these
 // handlers into our actual task objects.
@@ -183,9 +195,13 @@ func Index(w http.ResponseWriter, r *http.Request) {
  tag as the value.  This is to let the caller know how "popular" each tag is.
 ============================================================================*/
 func TagIndex(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I can get tags just for this user
+    user := UserIfOn(w, r)
+
     // fmt.Printf("TagIndex(): entry\n")
     if master.HasChildren() {
-        tags := master.Kids().GetChildTags()
+        tags := master.Kids(user).GetChildTags()
         if tags != nil {
             w.Header().Set("Content-Type", "application/json; charset=UTF-8")
             w.WriteHeader(http.StatusOK)
@@ -201,7 +217,11 @@ func TagIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func TaskIndex(w http.ResponseWriter, r *http.Request) {
-    // fmt.Printf("TaskIndex(): made it in\n")
+
+    // find my user so I can get tasks just for this user
+    user := UserIfOn(w, r)
+
+    // pull tag filter
     vars := mux.Vars(r)
     strtags := vars["tags"]
     var tags []string
@@ -217,13 +237,13 @@ func TaskIndex(w http.ResponseWriter, r *http.Request) {
         if tags != nil && len(tags) > 0 {
             // the second parm says to automatch today and this week
             // based on dates as well as explicit tag matches
-            matching := master.Kids().FindTagMatches(tags, true)
+            matching := master.Kids(user).FindTagMatches(tags, true)
             if len(matching) > 0 {
                 kids = fromTasks(matching)
             }
         } else {
             // convert kids to JSON-ready tasks            
-            kids = fromTasks(master.Kids())
+            kids = fromTasks(master.Kids(user))
         }
 
         if kids != nil {
@@ -241,9 +261,13 @@ func TaskIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func TaskShow(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I only return this task id if it is mine
+    user := UserIfOn(w, r)
+
     vars := mux.Vars(r)
     taskId := vars["taskId"]
-    t := master.FindChild(taskId)
+    t := master.FindChild(taskId, user)
     if t != nil {
         var j TaskJSON
         j.FromTask(t)
@@ -262,13 +286,17 @@ func TaskShow(w http.ResponseWriter, r *http.Request) {
 // of the URL the meta-data to match on.  For now, only
 // support date.
 func TaskFind(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I can get tasks just for this user
+    user := UserIfOn(w, r)
+
     vars := mux.Vars(r)
     strDate := vars["date"]
     fmt.Printf("strDate=<%v>\n",strDate)
     date, _ := time.Parse("2006-01-02", strDate)
     if !date.IsZero() {
         if master.HasChildren() {
-            matching := master.Kids().FindByCompletionDate(date)
+            matching := master.Kids(user).FindByCompletionDate(date)
             if len(matching) > 0 {
                 send := fromTasks(matching)
                 w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -294,6 +322,10 @@ func TaskFind(w http.ResponseWriter, r *http.Request) {
 // dates to fix the problem with timezones only from UTC (change
 // the client to ask for local time range and call this).
 func TaskGeneralFind(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I can get tasks just for this user
+    // user := UserIfOn(w, r) - don't bother until we actually implement this
+
     // tbd
     // FindBetweenCompletionDate()
     // extract the search criteria from the request
@@ -306,8 +338,12 @@ func TaskGeneralFind(w http.ResponseWriter, r *http.Request) {
 
 // TBD: combined with TaskFind
 func TaskFindToday(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I can get tasks just for this user
+    user := UserIfOn(w, r)
+
     if master.HasChildren() {
-        matching := master.Kids().FindToday()
+        matching := master.Kids(user).FindToday()
         if len(matching) > 0 {
             send := fromTasks(matching)
             w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -325,8 +361,12 @@ func TaskFindToday(w http.ResponseWriter, r *http.Request) {
 
 // TBD: combined with TaskFind
 func TaskFindThisWeek(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I can get tasks just for this user
+    user := UserIfOn(w, r)
+
     if master.HasChildren() {
-        matching := master.Kids().FindThisWeek()
+        matching := master.Kids(user).FindThisWeek()
         if len(matching) > 0 {
             send := fromTasks(matching)
             w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -344,6 +384,7 @@ func TaskFindThisWeek(w http.ResponseWriter, r *http.Request) {
 
 
 func taskRead(w http.ResponseWriter, r *http.Request) *TaskJSON {
+
     var task TaskJSON
     body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1048576))
     if err != nil {
@@ -364,6 +405,12 @@ func taskRead(w http.ResponseWriter, r *http.Request) *TaskJSON {
 }
 
 func TaskCreate(w http.ResponseWriter, r *http.Request) {
+
+    // find the user creating the task who will own it
+    user := UserFromRequest(w, r)
+    if user == nil { return }
+    // we don't use UserIfOn() - can create new tasks with users even temporarily
+
     // read the task from the request
     taskJSON := taskRead(w, r)
     if taskJSON == nil {
@@ -372,7 +419,7 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
 
     // create a persistable task in our world with a unique id
     t := NewTask(taskJSON.Name)
-    // var t Task
+    t.AddUser(user)
     taskJSON.ToTask(t, false)
     master.AddChild(t)
     // err := t.Save(true)
@@ -396,6 +443,9 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
 
 func TaskReplace(w http.ResponseWriter, r *http.Request) {
 
+    // find my user so I only change the task if it is mine
+    user := UserIfOn(w, r)
+
     // extract the task id from the request
     vars := mux.Vars(r)
     taskId := vars["taskId"]
@@ -403,7 +453,7 @@ func TaskReplace(w http.ResponseWriter, r *http.Request) {
     // make sure the task we wish to replace exists
     // note that we do not allow clients to specify the
     // id of a new task - POST is always used to create tasks
-    t := master.FindChild(taskId)
+    t := master.FindChild(taskId, user)
     if t == nil {
       errorResponse(w, pimErr(notFound))
       return
@@ -457,7 +507,9 @@ func TaskReplace(w http.ResponseWriter, r *http.Request) {
 
 
 func TaskUpdate(w http.ResponseWriter, r *http.Request) {
-    log.Println("update")
+
+    // find my user so I only change the task if it is mine
+    user := UserIfOn(w, r)
 
     // extract the task id from the request
     vars := mux.Vars(r)
@@ -466,7 +518,7 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
     // make sure the task we wish to replace exists
     // note that we do not allow clients to specify the
     // id of a new task - POST is always used to create tasks
-    t := master.FindChild(taskId)
+    t := master.FindChild(taskId, user)
     if t == nil {
       errorResponse(w, pimErr(notFound))
       return
@@ -505,20 +557,26 @@ func TaskUpdate(w http.ResponseWriter, r *http.Request) {
 
 func TaskDelete(w http.ResponseWriter, r *http.Request) {
 
+    // find my user so I only delete the task if it is mine
+    user := UserIfOn(w, r)
+
     // extract the task id from the request
     vars := mux.Vars(r)
     taskId := vars["taskId"]
 
     // make sure the task we wish to replace exists
-    t := master.FindChild(taskId)
+    t := master.FindChild(taskId, user)
     if t == nil {
       errorResponse(w, pimErr(notFound))
       return
     }
 
     // call the command system to perform the delete
-    // TBD - report errors actually doing the delete
-    CommandDeleteTask(t, nil)
+    err := CommandDeleteTask(t, nil)
+    if err != nil {
+      errorResponse(w, pimErr(deleteFailed))
+      return
+    }
 
     // set the successful response to indicate deletion
     w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -531,8 +589,12 @@ func TaskDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func TaskFindComplete(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I only return tasks that are mine
+    user := UserIfOn(w, r)
+
     if master.HasChildren() {
-        matching := master.Kids().FindCompleted()
+        matching := master.Kids(user).FindCompleted()
         if len(matching) > 0 {
             send := fromTasks(matching)
             w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -552,6 +614,9 @@ func TaskFindComplete(w http.ResponseWriter, r *http.Request) {
 // with a new "field" of "relativeImportance"?
 func TaskReorder(w http.ResponseWriter, r *http.Request) {
 
+    // find my user so I only change the task if it is mine
+    user := UserIfOn(w, r)    
+
     // extract the task ids from the request
     vars := mux.Vars(r)
     taskId := vars["taskId"]
@@ -559,7 +624,7 @@ func TaskReorder(w http.ResponseWriter, r *http.Request) {
     fmt.Printf("TaskReorder() taskId: %s targetId: %s vars: %v\n", taskId, targetId, vars)
 
     // make sure the task we wish to move exists
-    t := master.FindChild(taskId)
+    t := master.FindChild(taskId, user)
     if t == nil {
       errorResponse(w, pimErr(notFound))
       return
@@ -567,11 +632,11 @@ func TaskReorder(w http.ResponseWriter, r *http.Request) {
 
     // make sure the task we wish to move before exists
     // but if none specified we're moving to the end
-    target := master.FindChild(targetId)
+    target := master.FindChild(targetId, user)
 
     // make the change - assumes flat list for now
     // tbd: a better error return
-    err := t.MoveBefore(master.Kids(), target)
+    err := t.MoveBefore(master.Kids(user), target)
     if (err != nil) {
         errorResponse(w, pimErr(notFound))
         return
@@ -597,8 +662,10 @@ func TaskReorder(w http.ResponseWriter, r *http.Request) {
 ==============================================================================
  Undo()
 ------------------------------------------------------------------------------
+ TBD - somehow make this per-user!!!  Undo stack needed per user!
 ============================================================================*/
 func Undo(w http.ResponseWriter, r *http.Request) {
+
     // fmt.Printf("Undo(): entry\n")
     err := CommandUndo()
     if (err != nil) {
@@ -622,90 +689,12 @@ func Undo(w http.ResponseWriter, r *http.Request) {
 
 /*
 ==============================================================================
- UserSetAuthToken()
-------------------------------------------------------------------------------
- Inputs: w        ResponseWriter - response to write results / cookie into
-         username string         - username whose password is already ok-ed
-
- Errors: This function returns no errors.  It either writes an error to the
-         response or it sets the cookie and assumes its caller doesn't care.
-
- Takes care of the "http" level of signing in with an authentication token.
- This function also decides on the length of the token (TBD move into JWT
- code somehow).
-============================================================================*/
-func userSetAuthToken(w http.ResponseWriter, username string) {
-
-    // get a JWT token for this user that expires in 5 minutes
-    expirationTime := time.Now().Add(5 * time.Minute)
-    tokenString, err := UserGetAuthToken(username, expirationTime)
-    if err != nil {
-        // if there is an error in creating the JWT return an internal server error
-        errorResponse(w, pimErr(authErr))        
-        return
-    }
-
-    // set the client cookie for "token" as the JWT we just generated
-    // we also set an expiry time which is the same as the token itself
-    http.SetCookie(w, &http.Cookie{
-        Name:    "token",
-        Value:   tokenString,
-        Expires: expirationTime,
-    })    
-}
-
-/*
-==============================================================================
- UserCheckAuthToken()
-------------------------------------------------------------------------------
- Inputs:  w  ResponseWriter - response to write results / errors into
-          r  Request        - request holding the cookie with the token
- Returns: string            - username from the token or nill if error
- Errors: This function returns no errors.  It either writes an error to the
-         response or it returns a successfully decoded username.
-
- Takes care of the "http" level of authenticating a user request.  It is
- intended to call this method on every request to identify and authenticate
- the user.
-============================================================================*/
-func userCheckAuthToken(w http.ResponseWriter, r *http.Request) string {
-
-    // obtain the session token from the request cookies
-    c, err := r.Cookie("token")
-    if err != nil {
-        if err == http.ErrNoCookie {
-            // if the cookie is not set, return an unauthorized status
-            errorResponse(w, pimErr(authNoToken))
-            return ""
-        }
-        // for any other type of error, return a bad request status
-        errorResponse(w, pimErr(badRequest))
-        return ""
-    }
-
-    // get the JWT string from the cookie
-    tknStr := c.Value
-
-    // validate the token and set http responses properly
-    var username string
-    var errCode PimErrId
-    username, errCode = UserValidateAuthToken(tknStr)
-    if (err != nil) {
-        errorResponse(w, pimErr(errCode)) // this may need to be typed to pimErr
-        return ""
-    }
-    return username
-}
-
-/*
-==============================================================================
  UserSignup()
 ------------------------------------------------------------------------------
  Create a new user and automatically sign them in by returning an
  authentication token.
 ============================================================================*/
 func UserSignup(w http.ResponseWriter, r *http.Request) {
-    fmt.Printf("UserSignup(): entry\n")
 
     var creds UserCredentials
     // Get the JSON body and decode into credentials
@@ -725,20 +714,25 @@ func UserSignup(w http.ResponseWriter, r *http.Request) {
 
     // create the new user - may not create if email is invalid
     // or password is not up to standard
-    noob, errCreate := NewUser("unspecified", creds.Email, creds.Password)
+    // note that every user should get its own copy of the data mapper
+    noob, errCreate := NewUser("", "unspecified", creds.Email, creds.Password, storage.CopyDataMapper())
     if errCreate != success {
         errorResponse(w, pimErr(errCreate))
         return        
     }
 
+    // save the new user
+    err = noob.Save()
+    if err != nil {
+        errorResponse(w, pimErr(errCreate))
+        return
+    }
+
     // add the new user to the global list (move inside the object?)
     users = append(users, noob)
 
-    // for now output the id of the user created to allow us to compile
-    fmt.Printf("UserCreate(): created user:%s\n", noob)
-
     // now we have a valid user - return credentials to the client
-    userSetAuthToken(w, creds.Email)
+    UserSetAuthToken(w, creds.Email)
     successResponse(w)
 }
 
@@ -751,7 +745,6 @@ func UserSignup(w http.ResponseWriter, r *http.Request) {
  token into the response that the client can reuse on future requests.
 ============================================================================*/
 func UserSignin(w http.ResponseWriter, r *http.Request) {
-    fmt.Printf("UserSignin(): entry\n")
 
     // get the JSON body and decode into credentials
     var creds UserCredentials
@@ -767,9 +760,8 @@ func UserSignin(w http.ResponseWriter, r *http.Request) {
     // into the response
     user := users.FindByEmail(creds.Email)
     if user != nil {
-        expectedPassword := user.GetPassword()
-        if expectedPassword == creds.Password {
-            userSetAuthToken(w, creds.Email)
+        if user.CheckPassword(creds.Password) {
+            UserSetAuthToken(w, creds.Email)
             successResponse(w)        
             return
         }
@@ -783,3 +775,22 @@ func UserSignin(w http.ResponseWriter, r *http.Request) {
     return
 }
 
+/*
+==============================================================================
+ UserSignReup()
+------------------------------------------------------------------------------
+ Given an already authenticated user, issue a new set of authentication
+ credentials with a new expiration time.  Client is expected to call this
+ occassionaly to keep their user from timing out.
+============================================================================*/
+func UserSignReup(w http.ResponseWriter, r *http.Request) {
+
+    // find my user so I can get creds for next token
+    user := UserFromRequest(w, r)
+    if user == nil { return }
+
+    // create a new token
+    UserSetAuthToken(w, user.GetEmail())
+    successResponse(w)
+    return
+}

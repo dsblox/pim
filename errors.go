@@ -2,6 +2,7 @@ package main
 
 import (
     "net/http"
+    "errors"
 )
 
 type PimErrId int
@@ -19,6 +20,7 @@ const (
 	authTaken
 	authBadEmail
 	authBadPW
+	deleteFailed
 )
 
 type PimError struct {
@@ -41,6 +43,11 @@ func pimErr(id PimErrId) PimError {
 func pimSuccess() PimError {
 	return pimErrors[success]
 }
+func pimError(id PimErrId) error {
+	e := pimErr(id)
+	str := e.Error()
+	return errors.New(str)
+}
 
 
 
@@ -60,5 +67,6 @@ var pimErrors = PimErrors {
     PimError{ Code:authErr,     Msg:"pim: authentication error",       Response:http.StatusInternalServerError},
     PimError{ Code:authTaken,   Msg:"pim: request username taken",     Response:http.StatusOK},
     PimError{ Code:authBadEmail,Msg:"pim: invalid email provided",     Response:http.StatusOK},
-    PimError{ Code:authBadPW   ,Msg:"pim: insecure PW provided",       Response:http.StatusOK},    
+    PimError{ Code:authBadPW   ,Msg:"pim: insecure PW provided",       Response:http.StatusOK},
+    PimError{ Code:deleteFailed,Msg:"pim: unable to delete task",      Response:http.StatusInternalServerError},    
 }

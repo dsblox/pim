@@ -64,7 +64,7 @@
   <div class="container-fluid">
 
     <div class="row ml-1 mr-1 mb-0 p-0">
-      <pim-title-bar title="Today" :tags="allTags" :selected="selectedTags" :add="true" :box="true" @modal="modal({task:null,list:all,tags:['today'].concat(selectedTags)})" />
+      <pim-title-bar title="Today" :tags="allTags" :selected="selectedTags" :add="true" :box="true" @modal="modal({task:null,list:all,tags:['today']})" />
     </div>
 
     <div v-if="!boxView" class="row ml-0 mr-0 p-0">
@@ -185,7 +185,8 @@ v = new Vue({
       // set modalTask to something new it knows to show itself
       this.modalTask = taskInfo.task ? taskInfo.task : new Task()
       this.modalList = taskInfo.list
-      this.modalTags = taskInfo.tags
+      this.modalTags = taskInfo.tags.concat(taskInfo.task ? [] : selectedTags)
+      // adding the selected tags forces them onto new tasks
     },
     // this drag function, if enabled on a task-list
     // allows us to know what list an item is being
@@ -238,6 +239,12 @@ v = new Vue({
     }
   },
 })
+
+// refresh my access token on load and every once in while prior to expiration
+userSignReup()
+var intervalId = window.setInterval(function(){
+  userSignReup()
+}, refreshFrequency );
 
 </script>
 </body>

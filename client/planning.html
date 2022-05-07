@@ -60,7 +60,7 @@
 <div id="pim-root">
 
   <div>
-    <pim-navbar :items="nav" selected="Planning" @undo="undo" />
+    <pim-navbar :items="nav" selected="Planning" @undo="undo" @logout="logout()"/>
   </div>
 
   <div class="container-fluid">
@@ -124,7 +124,6 @@ function refreshPlanning() {
 // initialize ourselves
 refreshPlanning()
 
-
 // here is a root Vue to hold references to my models
 // the data references can be linked to components
 v = new Vue({
@@ -152,10 +151,10 @@ v = new Vue({
     modal: function(taskInfo) {
       // the modal component is bound to this.modalTask, so when we 
       // set modalTask to something new it knows to show itself
-      console.log(taskInfo.tags)
       this.modalTask = taskInfo.task ? taskInfo.task : new Task()
-      this.modalList = taskInfo.list;
-      this.modalTags = taskInfo.tags;
+      this.modalList = taskInfo.list
+      this.modalTags = taskInfo.tags.concat(taskInfo.task ? [] : selectedTags)
+      // adding the selected tags forces them onto new tasks
     },
     modalSave: function(args) {
       // update the task I asked to be edited for display
@@ -181,8 +180,18 @@ v = new Vue({
     undo: function() {
       cmdUndo() // execute undo on server
     },    
+    logout: function() {
+      // call server soon to invalidate login token?
+      window.location = "index.html"
+    },
   },
 })
+
+// refresh my access token on load and every once in while prior to expiration
+userSignReup()
+var intervalId = window.setInterval(function(){
+  userSignReup()
+}, refreshFrequency )
 
 </script>
 </body>

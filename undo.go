@@ -81,8 +81,9 @@ func CommandDo(cmd Command) error {
 
 func CommandUndo() error {
     if commands == nil || commands.IsEmpty() {
-        log.Print(commandLog("UNDO-ERROR", "Nothing to Undo"))
-        return errors.New("nothing to undo")
+        err := errors.New("nothing to undo")
+        log.Print(commandLog("UNDO-ERROR", "Nothing to Undo", err))
+        return err
     } else {
         cmd := commands.Pop()
         err := cmd.Undo()
@@ -90,8 +91,12 @@ func CommandUndo() error {
     }
 }
 
-func commandLog(cmd string, context string) string {
-    return fmt.Sprintf("CMD-%s-%s\n", cmd, context)    
+func commandLog(cmd string, context string, err error) string {
+    sErr := "SUCCESS"
+    if err != nil {
+        sErr = err.Error()
+    }
+    return fmt.Sprintf("CMD-%s-%s-%s\n", cmd, context, sErr)
 }
 
 /*
@@ -117,10 +122,11 @@ func (dtc *deleteTaskCmd) Exec() error {
     // TBD: save additional parents and children
 
     // delete the task which will immediately delete in storage
-    dtc.sLog = commandLog("EXEC-DELETE", dtc.tDelete.GetName())
-    dtc.tDelete.Remove(dtc.tNewParent)
+    logContext := dtc.tDelete.GetName()
+    err := dtc.tDelete.Remove(dtc.tNewParent)
+    dtc.sLog = commandLog("EXEC-DELETE", logContext, err)
 
-    return nil
+    return err
 }
 
 func (dtc *deleteTaskCmd) Undo() error {
@@ -130,10 +136,10 @@ func (dtc *deleteTaskCmd) Undo() error {
     // TBD re-establish multiple parents and children
 
     // save the task
-    dtc.tDelete.Save(true)
-    dtc.sLog = commandLog("UNDO-DELETE", dtc.tDelete.GetName())
+    err := dtc.tDelete.Save(true)
+    dtc.sLog = commandLog("UNDO-DELETE", dtc.tDelete.GetName(), err)
 
-    return nil
+    return err
 }
 
 func (dtc *deleteTaskCmd) Log() string {
@@ -145,8 +151,8 @@ func CommandDeleteTask(t *Task, tNewParent *Task) error {
     cmdDelete = new(deleteTaskCmd)
     cmdDelete.tDelete = t
     cmdDelete.tNewParent = nil
-    CommandDo(cmdDelete)
-    return nil
+    err := CommandDo(cmdDelete)
+    return err
 }
 
 
@@ -170,10 +176,10 @@ func (ctc *createTaskCmd) Exec() error {
 
     // TBD: save additional parents and children
 
-    // delete the task which will immediately delete in storage
+    // create the task which will immediately create in storage
     // fmt.Printf("createTaskCmd.Exec(): creating %s\n", ctc.tCreate.GetName())
-    ctc.sLog = commandLog("EXEC-CREATE", ctc.tCreate.GetName())         
     err := ctc.tCreate.Save(true)   
+    ctc.sLog = commandLog("EXEC-CREATE", ctc.tCreate.GetName(), err)
 
     return err
 }
@@ -182,9 +188,9 @@ func (ctc *createTaskCmd) Undo() error {
     // TBD - consider how we would redo multiple parents and children
     // delete the task
     // fmt.Printf("createTaskCmd.Undo(): undoing create of %s\n", ctc.tCreate.GetName())    
-    ctc.tCreate.Remove(nil) // nil -> orphan any of my children ???
-    ctc.sLog = commandLog("UNDO-CREATE", ctc.tCreate.GetName())    
-    return nil
+    err := ctc.tCreate.Remove(nil) // nil -> orphan any of my children ???
+    ctc.sLog = commandLog("UNDO-CREATE", ctc.tCreate.GetName(), err)
+    return err
 }
 
 func (ctc *createTaskCmd) Log() string {
@@ -243,16 +249,17 @@ func (utc *updateTaskCmd) Exec() error {
     // modify the task which will immediately change in storage
     // all we need to do is save the modified task
     // fmt.Printf("updateTaskCmd.Exec(): changing %s\n", utc.tPrior.GetName())
-    utc.sLog = commandLog("EXEC-UPDATE", utc.tUpdate.GetName())             
-    err := utc.tUpdate.Save(false)    
+    err := utc.tUpdate.Save(false) 
+    utc.sLog = commandLog("EXEC-UPDATE", utc.tUpdate.GetName(), err)
     return err
 }
 
 func (utc *updateTaskCmd) Undo() error {
     // copy the object values back and resave
-    utc.sLog = commandLog("UNDO-UPDATE", utc.tUpdate.GetName())
+    errContext := utc.tUpdate.GetName()
     utc.tPrior.Copy(utc.tUpdate)
     err := utc.tUpdate.Save(true)
+    utc.sLog = commandLog("UNDO-UPDATE", errContext, err)
     return err
 }
 

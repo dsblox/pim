@@ -15,6 +15,66 @@
    * the state change is reflected on the server.
 ========================================================================*/
 
+/*
+=========================================================================
+ TEMPORARY FLAG to ask server to ignore users and show tasks for all 
+ users: used while developing user functionality in the first place, 
+ but keeping the app useful for me before I have my own user set on 
+ all the tasks :-).  This is the only code I use to (dangerously) set
+ cookies via JavaScript so remove the cookie code when we remove the
+ ignoreusers flag.
+-----------------------------------------------------------------------*/
+function getCookie(cname) {
+  let name = cname + "=";
+  let decodedCookie = decodeURIComponent(document.cookie);
+  let ca = decodedCookie.split(';');
+  for(let i = 0; i <ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) == 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
+  return "";
+}
+
+function setCookie(cname, cvalue, exdays) {
+  const d = new Date();
+  d.setTime(d.getTime() + (exdays*24*60*60*1000));
+  let expires = "expires="+ d.toUTCString();
+  document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+
+function deleteCookie(cname) {
+  setCookie(cname, "", 0)
+}
+
+var ignoreusers = getCookie("ignoreusers")
+function showTasksForAllUsers() {
+  setCookie("ignoreusers", true, 1)
+}
+function showTasksForCurrentUser() {
+  deleteCookie("ignoreusers")
+}
+function toggleIgnoreUsers() {
+  // console.log("toggleIgnoreUsers(): ignoreusers going from <" + ignoreusers + "> to <" + !ignoreusers + ">")
+  if (ignoreusers) {
+    showTasksForCurrentUser()
+  }
+  else {
+    showTasksForAllUsers()
+  }
+  ignoreusers = !ignoreusers
+  forceRefresh()
+}
+
+/*
+=========================================================================
+ Refresh frequency to refresh authentication tokens from server.
+-----------------------------------------------------------------------*/
+const refreshFrequency = 1000 * 60 * 4 // 4 minutes
 
 /*
 =========================================================================
@@ -104,7 +164,7 @@ function pimShowError(message) {
 }
 
 function forceRefresh() {
-  console.log("forceRefresh(): incrementing global refresh now to " + (refreshNow.i+1))
+  // console.log("forceRefresh(): incrementing global refresh now to " + (refreshNow.i+1))
   refreshNow.i++
 }
 

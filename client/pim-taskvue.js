@@ -960,6 +960,9 @@ Vue.component('pim-navbar', {
     logout: function() {
       this.$emit('logout')
     },
+    ignore: function() {
+      toggleIgnoreUsers()
+    }
   },  
   template: ' \
               <nav class="navbar navbar-default navbar-expand-sm navbar-light bg-light rounded"> \
@@ -972,6 +975,9 @@ Vue.component('pim-navbar', {
                     <pim-navitem v-for="item in items" :key="item.display" :name="item.display" :target="item.route" :selected="item.display==selected" /> \
                   </ul> \
                   <ul class="nav navbar-nav ml-auto"> \
+                    <li class="nav-item"> \
+                      <a class="nav-link" href="#" @click="ignore"><span class="fa fa-users"></span> Multi</a> \
+                    </li> \
                     <li class="nav-item"> \
                       <a class="nav-link" href="#" @click="undo"><span class="fa fa-undo"></span> Undo</a> \
                     </li> \

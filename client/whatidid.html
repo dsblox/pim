@@ -59,7 +59,7 @@
 <div id="pim-root">
 
   <div>
-    <pim-navbar :items="nav" selected="History" @undo="undo" />
+    <pim-navbar :items="nav" selected="History" @undo="undo" @logout="logout" />
   </div>
 
   <div class="container-fluid">
@@ -183,10 +183,19 @@ v = new Vue({
     },
     undo: function() {
       cmdUndo() // execute undo on server
-    }    
+    },
+    logout: function() {
+      // call server soon to invalidate login token?
+      window.location = "index.html"
+    },     
   },
 })
 
+// refresh my access token on load and every once in while prior to expiration
+userSignReup()
+var intervalId = window.setInterval(function(){
+  userSignReup()
+}, refreshFrequency );
 
 </script>
 </body>
