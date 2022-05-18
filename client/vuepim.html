@@ -74,18 +74,27 @@
       </pim-column>
 
       <pim-column :show="centerShow" >
-        <pim-task-list :task-list="all" :title="titleLists[1]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
+        <div class="row">
+          <div class="col-sm-12">
+            <pim-task-list :task-list="all" :title="titleLists[1]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags.concat(['!later'])" systag="today" hidewhenempty @numtasks="numtasks" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-sm-12">
+            <pim-task-list :task-list="all" :title="titleLists[2]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags.concat(['later'])" systag="today" hidewhenempty @numtasks="numtasks" />
+          </div>
+        </div>
       </pim-column>
 
       <pim-column :show="rightShow" > 
         <div class="row">
             <div class="col-sm-12">
-              <pim-task-list :task-list="all" :title="titleLists[2]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
+              <pim-task-list :task-list="all" :title="titleLists[3]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
             </div>
         </div>
         <div class="row">
           <div class="col-sm-12">
-            <pim-task-list :task-list="all" :title="titleLists[3]" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" :copy="true" hidewhenempty @numtasks="numtasks" />
+            <pim-task-list :task-list="all" :title="titleLists[4]" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" :copy="true" hidewhenempty @numtasks="numtasks" />
           </div>
         </div>
       </pim-column>
@@ -157,8 +166,8 @@ v = new Vue({
     leftShow: true,  //       against the visLists array of bools!
     centerShow: true,//       so had to create these bools
     rightShow: true,
-    titleLists: ["Calendar", "Stuff To Do", "In Progress", "Done"],
-    visLists: [true, true, false, true],
+    titleLists: ["Calendar", "Stuff To Do", "Stuff To Do Later", "In Progress", "Done"],
+    visLists: [true, true, true, false, true],
     boxView: false,
     refreshNow: refreshNow, // trigger to force refresh of screen
   },
@@ -176,8 +185,8 @@ v = new Vue({
         let vis = (args.count > 0)
         this.visLists[idxChange] = vis
         this.leftShow = this.visLists[0]
-        this.centerShow = this.visLists[1]
-        this.rightShow = this.visLists[2] || this.visLists[3]
+        this.centerShow = this.visLists[1] || this.visLists[2]
+        this.rightShow = this.visLists[3] || this.visLists[4]
       }
     },
     modal: function(taskInfo) {

@@ -769,12 +769,14 @@ Vue.component('pim-modal', {
       // the same thing because we want to "undo" any changes
       // made while we were editing.  Needed in case a task is
       // edited in the box, canceled, then clicked again
-      this.load() 
+      // ^^^ I think this comment is obsolete - we have this cleaner now
+      // this.load() 
 
       // tell my parent so it can clear the box for next time
       this.$emit('dismiss')
     },
-    save: function() { 
+    save: function(e, markComplete) { 
+
       // bring the tags and date form fields together
       this.t.addTagsFromString(this.strtags) // tags combined from t and text box
       this.t.setTargetStart(this.strdate, this.strtime)
@@ -786,15 +788,25 @@ Vue.component('pim-modal', {
         this.t.setEstimate(0)
       }
 
+      if (markComplete && !this.t.isComplete()) {
+        this.t.markComplete()        
+        now = new Date();
+        this.t.setActualCompletionTime(now);
+        this.t.dirty = ["state", "actualcompletiontime"];
+      }
+
       // tell my parent so it can persist and update actual tasks in the lists
       this.$emit('save', {task: this.t, list: this.list, systags: this.systags})
 
       // clear the box manually since it won't trigger on load for some reason
+      // i think we now have the working cleaner - no longer needed?
+      /*
       this.t = new Task()
       this.strtime = ""
       this.strdate = ""
       this.strtags = "" // always clear the "add tags" box
       this.strlink = ""
+      */
     },
     deltask: function() { // remove the task from the list and call the server
       this.list.removeTask(this.task) // we'll take care of the JS objects
@@ -808,7 +820,11 @@ Vue.component('pim-modal', {
         // for now get the first link only
         let links = this.t.getLinks()
         if (links && links.length) {
+          console.log("load: link = " + links[0].url)
           this.strlink = links[0].url
+        }
+        else {
+          this.strlink = ""
         }
       }
       else {
@@ -818,13 +834,6 @@ Vue.component('pim-modal', {
         this.strlink = ""
       }
       this.strtags = "" // always clear the "add tags" box
-
-      /*
-      if (this.t.getName().length > 0) {
-        console.log("setting creating to " + (this.t.getName().length > 0) )
-        this.creating = false
-      }
-      */
 
       // make myself visible anytime i'm loaded
       $('#myModal').modal('show')      
@@ -841,13 +850,18 @@ Vue.component('pim-modal', {
     // anytime the task prop is set (when invoking modal) load it up
     // note modal "holds" last task until another is clicked
     task: function() {
-      this.load();
+      if (this.task != null) {
+        this.load();
+      }
     },
   },
   computed: {
     creating: function() { // controls appearance of delete button and title of box
-       return (this.t.id == null)
-     },
+      return (this.t.id == null)
+    },
+    complete: function() {
+      return (this.t.isComplete())
+    },
     title: function() { // set the modal title based on whether a task was provided
       if (!this.creating) {
         return "Edit Task" //  + this.task.getName();
@@ -861,7 +875,7 @@ Vue.component('pim-modal', {
                 <div class="modal-content"> \
                   <div class="modal-header"> \
                     <h5 class="modal-title" id="myModalLabel">{{title}}</h5> \
-                    <button type="button" class="close" v-on:click="cancel" data-dismiss="modal" aria-label="Close"> \
+                    <button type="button" class="close" @click="cancel" data-dismiss="modal" aria-label="Close"> \
                       <span aria-hidden="true">&times;</span> \
                     </button> \
                   </div> \
@@ -904,7 +918,7 @@ Vue.component('pim-modal', {
                           <div class="input-group-prepend"> \
                             <label class="input input-group-text" for="link">Hyperlink:</label> \
                           </div> \
-                          <input type="text" class="form-control" id="link" placeholder="Include http protocol for now" v-model.number="strlink"> \
+                          <input type="text" class="form-control" id="link" placeholder="Include http protocol for now" v-model="strlink"> \
                         </div> \
                       </div> \
                       <div><span>&nbsp;</span></div> \
@@ -924,9 +938,9 @@ Vue.component('pim-modal', {
                       <input type="hidden" id="thisweek" value="false"> \
                     </div> \
                     <div class="modal-footer"> \
-                      <button v-if="!creating" type="button" class="btn btn-secondary" data-dismiss="modal" v-on:click="deltask" id="delete">Delete Task</button> \
-                      <!-- button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel">Cancel</button --> \
-                      <button type="submit" class="btn btn-primary" data-dismiss="modal" v-on:click="save" id="save">Save Task</button> \
+                      <button v-show="!creating" type="button" class="btn btn-secondary" data-dismiss="modal" @click="deltask" id="delete">Delete Task</button> \
+                      <button v-show="!complete" type="button" class="btn btn-primary"   data-dismiss="modal" @click="save($event,true)" id="savecomplete">Save Complete</button> \
+                      <button                    type="submit" class="btn btn-primary"   data-dismiss="modal" @click="save($event,false)" id="save">Save Task</button> \
                     </div> \
                   </form> \
                 </div> \

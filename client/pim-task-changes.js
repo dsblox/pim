@@ -384,6 +384,7 @@ function deleteTask(task) {
  Result: task is written to the server as needed to persist the change
 =======================================================================*/
 function changeTaskState(task) {
+  // console.log("changeTaskState")
   if (task == null) { return; }
 
   if (task.isComplete()) {
