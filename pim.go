@@ -358,7 +358,7 @@ func initKnownUsers(tdm TaskDataMapper) (Users, error) {
 }
 
 func runServerApp(port string, files string, certs string, dbName string) {
-  log.Printf("Will run as server soon\n")
+  log.Printf("Will run as server soon... should be CORS sensitive\n")
 
   // initialize the backend storage mechanism requests
   tdm, err := initStorage(dbName)
@@ -398,11 +398,11 @@ func runServerApp(port string, files string, certs string, dbName string) {
 // console app vs. web server
 func main() {
 
-  var server          bool
+  var server                bool
   var static_files_location string
-  var certs_location      string
-  var listenport        string
-  var dbName          string
+  var certs_location        string
+  var listenport            string
+  var dbName                string
   flag.BoolVar(&server, "server", false, "start pim as web server rather than console app")
   flag.StringVar(&static_files_location, "html", "./client", "specify path to static web files on this server")
   flag.StringVar(&certs_location, "certs", ".", "specify path to TLS certificates on this server")

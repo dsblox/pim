@@ -75,7 +75,7 @@
       </div>
 
       <div class="col pl-1">
-        <pim-task-list :task-list="currday" title="Done" @modal="modal" :tags="selectedTags" :state="1" />
+        <pim-task-list :task-list="currday" title="Done" @modal="modal" :tags="selectedTags" :state="1" :copy="true" />
       </div>
 
     </div>
@@ -91,7 +91,6 @@
 </div>
 
 <script>
-
 
 function myDateChanged(newDate) {
   loadTasksByDay(newDate);

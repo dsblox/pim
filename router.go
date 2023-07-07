@@ -21,6 +21,15 @@ func NewRouter(files string) *mux.Router {
             handler = UserAuthenticator(handler)
         }
         handler = Logger(handler, route.Name)
+/*
+        // add the CORS handling in
+        credentials := handlers.AllowCredentials()
+        methods := handlers.AllowedMethods([]string{"POST"})
+        ttl := handlers.MaxAge(3600)
+        origins := handlers.AllowedOrigins([]string{"*"})
+        handler = handlers
+   log.Fatal(http.ListenAndServe(":5000", handlers.CORS(credentials, methods, origins)(router)))
+*/
 
         // we make query parameters optional by registering the route 2x
         // once with the query parameters and once without, and the one

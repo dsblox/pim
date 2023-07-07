@@ -95,8 +95,14 @@ function timeToForm(date) {
   * undoURL - calls the server to undo the most recent action
   * signinURL - calls the server to signin
 ========================================================================*/
-// we should find a way to make this more dynamic
-var baseURL = "https://localhost:4000/";
+
+// for now we assume API and JS are served from the same server which
+// delays our need to implement CORS processing on the server, but
+// eventually we'll need to change this.
+const url = new URL(window.location)
+var baseURL = url.origin + "/"
+// var baseURL = "https://pim.blockshots.com/" 
+// var baseURL = "https://localhost:4000/"
 
 function makeURL(cmd, tags = null) {
   var params = "";

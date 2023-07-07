@@ -59,3 +59,18 @@ func Logger(inner http.Handler, name string) http.Handler {
 
     })
 }
+
+func CORS(inner http.Handler, name string) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+        // log.Fatal(http.ListenAndServe(":5000", handlers.CORS(credentials, methods, origins)(router)))
+        
+        credentials := handlers.AllowCredentials()
+        methods := handlers.AllowedMethods([]string{"POST"})
+        ttl := handlers.MaxAge(3600)
+        origins := handlers.AllowedOrigins([]string{"*"})
+
+        inner.ServeHTTP(w, r)
+    })    
+}
+

@@ -31,8 +31,8 @@ services:
   app:
     image: dsblox/pim
     ports: 
-      - "4000:4000"
-    working_dir: ${CONT_PIM_PATH}
+      - "443:4000"
+    working_dir: /go/pkg/mod/githib.com/dsblox/pim-v0.1.1 # ${CONT_PIM_PATH}
     environment:
       # i preferred to have the PIM code use env for host lookup than 
       # hard-coding the host.  Docker does set up a "host" within the
@@ -44,6 +44,7 @@ services:
       - db
     links:
       - db
+    # command: pim -server 
 
 
   # for development it can be convenient to jump into psql to play with
