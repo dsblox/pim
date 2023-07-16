@@ -203,7 +203,7 @@ func initMasterTask(tdm TaskDataMapper) (*Task, error) {
 }
 
 func runConsoleApp(dbName string) {
-  fmt.Printf("*** Welcome to PIM - The Task Manager for Your Life ***\n")
+  fmt.Printf("*** Welcome to PIM - The Perfect Task Manager for Your Life ***\n")
 
   // make sure we have somewhere to load / save things
   tdm, err := initStorage(dbName)
@@ -358,7 +358,7 @@ func initKnownUsers(tdm TaskDataMapper) (Users, error) {
 }
 
 func runServerApp(port string, files string, certs string, dbName string) {
-  log.Printf("Will run as server soon... should be CORS sensitive\n")
+  log.Printf("Will run as server soon...\n")
 
   // initialize the backend storage mechanism requests
   tdm, err := initStorage(dbName)

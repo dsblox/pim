@@ -11,10 +11,12 @@ import (
     "github.com/gorilla/mux"
 )
 
+/*
 func enableCors(w *http.ResponseWriter) {
     fmt.Printf("enabling CORS *\n")
     (*w).Header().Set("Access-Control-Allow-Origin", "*")
 }
+*/
 
 // TEMPORARY way to allow all tasks to be owned by one user while developing user behavior
 func UserIfOn(w http.ResponseWriter, r *http.Request) *User {
@@ -751,7 +753,7 @@ func UserSignup(w http.ResponseWriter, r *http.Request) {
 ============================================================================*/
 func UserSignin(w http.ResponseWriter, r *http.Request) {
     fmt.Println("UserSignin() - entry")
-    enableCors(&w) 
+    // enableCors(&w) 
 
     // get the JSON body and decode into credentials
     var creds UserCredentials

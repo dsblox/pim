@@ -32,19 +32,18 @@ services:
     image: dsblox/pim
     ports: 
       - "443:4000"
-    working_dir: /go/pkg/mod/githib.com/dsblox/pim-v0.1.1 # ${CONT_PIM_PATH}
+    working_dir: /app
     environment:
       # i preferred to have the PIM code use env for host lookup than 
       # hard-coding the host.  Docker does set up a "host" within the
       # container with the same name as the link alias.
       DAB_DB_HOST: db 
-    volumes: # these directory environment variables are set in dev-env.sh
-      - ${HOST_PIM_PATH}:${CONT_PIM_PATH}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     links:
       - db
-    # command: pim -server 
+    command: pim -server 
 
 
   # for development it can be convenient to jump into psql to play with
@@ -59,6 +58,7 @@ services:
     links:
       - db:postgres
     command: psql -h postgres -U postgres
+    profiles: ["manual-use"] # makes it easy to run manually, but ignores on up / start
 
   # a simple posgres instance - the app will initialize this DB if it
   # finds it empty - so vanilla postgres is all that is needed here
@@ -69,4 +69,9 @@ services:
     image: postgres
     environment: 
       POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5      
 

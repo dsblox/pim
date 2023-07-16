@@ -60,6 +60,7 @@ func Logger(inner http.Handler, name string) http.Handler {
     })
 }
 
+/*
 func CORS(inner http.Handler, name string) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -73,4 +74,4 @@ func CORS(inner http.Handler, name string) http.Handler {
         inner.ServeHTTP(w, r)
     })    
 }
-
+*/

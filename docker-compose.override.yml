@@ -1,0 +1,15 @@
+# the main docker compose file is for production
+# this override makes the same docker compose work for local development
+# note that it is OK to build docker images with this file in place
+#  because the production host instance will never have the entire
+#  code in it (it will only have the production docker-compose.yml)
+version: '2'
+
+# the directory environment variables below are set in dev-env.sh
+# and this maps the local files system OVER the containers native /app dir
+services:
+  app:
+    working_dir: ${CONT_PIM_PATH}
+    volumes:
+      - ${HOST_PIM_PATH}:${CONT_PIM_PATH}
+
