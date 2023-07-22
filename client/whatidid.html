@@ -82,7 +82,7 @@
   </div>
 
   <div>
-    <pim-modal :task="modalTask" :list="modalList" page="history" :systags="modalTags" @save="modalSave" @dismiss="modalDismiss"/>
+    <pim-modal :task="modalTask" :list="modalList" page="history" :systags="modalTags" :states="states" @save="modalSave" @dismiss="modalDismiss"/>
   </div>
   <div>
     <pim-alert :message="warnMessage" :show="warnShow" @dismiss="warnDismiss" /> 

@@ -9,6 +9,7 @@ function guid() {
 }
 
 var TaskState = {
+  UNSPECIFIED:-1,
   NOT_STARTED: 0,
   COMPLETE:    1,
   IN_PROGRESS: 2,

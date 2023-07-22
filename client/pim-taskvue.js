@@ -753,7 +753,7 @@ Vue.component('pim-title-bar', {
  notice that a new task has been set on me.
 ====================================================================*/
 Vue.component('pim-modal', {
-  props: ['task', 'list', 'page', 'systags'],
+  props: ['task', 'list', 'page', 'systags', 'states'],
   data: function() {
     return {
       t: new Task(),
@@ -775,7 +775,7 @@ Vue.component('pim-modal', {
       // tell my parent so it can clear the box for next time
       this.$emit('dismiss')
     },
-    save: function(e, markComplete) { 
+    save: function(e, newState) { 
 
       // bring the tags and date form fields together
       this.t.addTagsFromString(this.strtags) // tags combined from t and text box
@@ -788,11 +788,19 @@ Vue.component('pim-modal', {
         this.t.setEstimate(0)
       }
 
-      if (markComplete && !this.t.isComplete()) {
-        this.t.markComplete()        
-        now = new Date();
-        this.t.setActualCompletionTime(now);
-        this.t.dirty = ["state", "actualcompletiontime"];
+      // normal behavior saves without changing state, but a new state may be specified
+      if (newState != this.states.UNSPECIFIED) {
+        if (newState == this.states.COMPLETE && !this.t.isComplete()) {
+          this.t.markComplete()        
+          now = new Date();
+          this.t.setActualCompletionTime(now);
+          this.t.dirty = ["state", "actualcompletiontime"];
+        }
+
+        else if (newState == this.states.IN_PROGRESS && !this.t.isInProgress()) {
+          this.t.markInProgress()
+          // should we be clearing the completion time?  we are not for now
+        }
       }
 
       // tell my parent so it can persist and update actual tasks in the lists
@@ -861,6 +869,9 @@ Vue.component('pim-modal', {
     },
     complete: function() {
       return (this.t.isComplete())
+    },
+    inprogress: function() {
+      return (this.t.isInProgress())
     },
     title: function() { // set the modal title based on whether a task was provided
       if (!this.creating) {
@@ -938,9 +949,10 @@ Vue.component('pim-modal', {
                       <input type="hidden" id="thisweek" value="false"> \
                     </div> \
                     <div class="modal-footer"> \
-                      <button v-show="!creating" type="button" class="btn btn-secondary" data-dismiss="modal" @click="deltask" id="delete">Delete Task</button> \
-                      <button v-show="!complete" type="button" class="btn btn-primary"   data-dismiss="modal" @click="save($event,true)" id="savecomplete">Save Complete</button> \
-                      <button                    type="submit" class="btn btn-primary"   data-dismiss="modal" @click="save($event,false)" id="save">Save Task</button> \
+                      <button v-show="!creating"   type="button" class="btn btn-secondary" data-dismiss="modal" @click="deltask" id="delete">Delete</button> \
+                      <button v-show="!inprogress" type="button" class="btn btn-primary"   data-dismiss="modal" @click="save($event,states.IN_PROGRESS)" id="saveinprogress">Save In Progress</button> \
+                      <button v-show="!complete"   type="button" class="btn btn-primary"   data-dismiss="modal" @click="save($event,states.COMPLETE)"    id="savecomplete">Save Complete</button> \
+                      <button                      type="submit" class="btn btn-primary"   data-dismiss="modal" @click="save($event,states.UNSPECIFIED)" id="save">Save</button> \
                     </div> \
                   </form> \
                 </div> \
