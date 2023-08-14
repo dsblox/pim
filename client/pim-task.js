@@ -283,13 +283,18 @@ class Task {
     return true;
   }
 
-  getTags(separator = null, except = null) {
+  getTags(separator = null, except = null, only = null) {
     if (this.tags != null) {
 
       // if tags-to-exclude specified then exclude them
       let tagsToUse = this.tags
       if (except != null) {
         tagsToUse = this.tags.filter(t => !except.includes(t))
+      }
+
+      // if tags-to-include specified then reduce to them
+      if (only != null) {
+        tagsToUse = tagsToUse.filter(t => only.includes(t))
       }
 
       // if separator specified then I want the tags as a string

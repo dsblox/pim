@@ -399,6 +399,8 @@ Vue.component('pim-tagpicker', {
                       tasks in the list, allowing the tag to be turned
                       on and off
          clone      - modify toggletag to clone the task
+         showtags   - display all tags on this task (too wordy rn)
+                      TBD: change to take a list of relevant tags to
 
  Events: drag   - emitted when i'm being dragged
          drop   - emitted when another task has been dropped on me
@@ -447,7 +449,7 @@ Vue.component('pim-task', {
                   <pim-task-links v-bind:links="this.task.getLinks()" /> \
               </div> \
               <div class="p-0 d-flex justify-content-end align-items-baseline"> \
-                <pim-tagpicker v-if="this.showtags" :tags="this.task.getTags(null, [\'today\', \'thisweek\'])" /> \
+                <pim-tagpicker v-if="this.showtags" :tags="this.task.getTags(null, [\'today\', \'thisweek\'], this.showtags)" /> \
                 <pim-duration :duration="task.estimateString()" /> \
                 <pim-startstop :task="task" class="pl-1" /> \
                 <pim-task-toggletag :task="task" v-if="this.toggletag" :tag="toggletag" class="pl-1" /> \
@@ -455,6 +457,13 @@ Vue.component('pim-task', {
               </div> \
             </div>'
 })
+
+/*
+TBD: enhance getTags() - which retrieves tags from the task and already has an
+    "exlcude" list, we need to enhance it with a "must match" list.  Change
+    "showTags" to take a list of tags to include, and we'll be able to
+    provide a list instead of a boolean to the showtags property.
+*/
 
 /*
 ======================================================================
@@ -473,6 +482,7 @@ Vue.component('pim-task', {
          sort          - ordering, one of: for now just by state
          toggletag     - let each task toggle the specified tag
          clone         - let each task be cloned and add this tag (and remove systag)
+         showtags      - display all tags on each task (too wordy rn)
 
  Events: drag   - emitted when one of our tasks if being dragged
          drop   - emitted when one of out asks has been dropped upon
@@ -540,6 +550,10 @@ Vue.component('pim-task-list', {
     clone: { // tell us the tag to set on the clone (and reset systag)
       default: null,
       type: String
+    },
+    showtags: { // for now - show specified tags on each task in this list
+      default: null,
+      type: Array
     },
   },
   methods: {
@@ -669,7 +683,7 @@ Vue.component('pim-task-list', {
                 <pim-task v-for="task in matchingtasks.tasks" \
                               :key="task.id" :task="task" :toggletag="toggletag" \
                               :clone="clone" \
-                              :showtags="false" \
+                              :showtags="showtags" \
                               @drag="drag" @drop="drop" \
                               @editme="edittask" \
                               @clonetask="clonetask" \

@@ -70,18 +70,18 @@
     <div v-if="!boxView" class="row ml-0 mr-0 p-0">
 
       <pim-column :show="leftShow" >
-        <pim-task-list :task-list="all" :title="titleLists[0]" time :state="0" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
+        <pim-task-list :task-list="all" :title="titleLists[0]" time :state="0" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" :showtags="['Urgent']" />
       </pim-column>
 
       <pim-column :show="centerShow" >
         <div class="row">
           <div class="col-sm-12">
-            <pim-task-list :task-list="all" :title="titleLists[1]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags.concat(['!later'])" systag="today" hidewhenempty @numtasks="numtasks" />
+            <pim-task-list :task-list="all" :title="titleLists[1]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags.concat(['!later'])" systag="today" hidewhenempty @numtasks="numtasks" :showtags="['Urgent']" />
           </div>
         </div>
         <div class="row">
           <div class="col-sm-12">
-            <pim-task-list :task-list="all" :title="titleLists[2]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags.concat(['later'])" systag="today" hidewhenempty @numtasks="numtasks" />
+            <pim-task-list :task-list="all" :title="titleLists[2]" :time="false" :state="0" @drop="drop" @modal="modal" :tags="selectedTags.concat(['later'])" systag="today" hidewhenempty @numtasks="numtasks" :showtags = "['Urgent']" />
           </div>
         </div>
       </pim-column>
@@ -89,12 +89,12 @@
       <pim-column :show="rightShow" > 
         <div class="row">
             <div class="col-sm-12">
-              <pim-task-list :task-list="all" :title="titleLists[3]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" />
+              <pim-task-list :task-list="all" :title="titleLists[3]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" :showtags = "['Urgent']" />
             </div>
         </div>
         <div class="row">
           <div class="col-sm-12">
-            <pim-task-list :task-list="all" :title="titleLists[4]" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" :copy="true" hidewhenempty @numtasks="numtasks" />
+            <pim-task-list :task-list="all" :title="titleLists[4]" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" :copy="true" hidewhenempty @numtasks="numtasks" :showtags = "['Urgent']" />
           </div>
         </div>
       </pim-column>
