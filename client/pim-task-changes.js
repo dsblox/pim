@@ -23,6 +23,10 @@
  all the tasks :-).  This is the only code I use to (dangerously) set
  cookies via JavaScript so remove the cookie code when we remove the
  ignoreusers flag.
+
+ NOTE: On 8/22/23 I removed the ignoreusers functionality, but I left
+ the basic cookie functoins in case I need them again for some other
+ functionality.
 -----------------------------------------------------------------------*/
 function getCookie(cname) {
   let name = cname + "=";
@@ -49,25 +53,6 @@ function setCookie(cname, cvalue, exdays) {
 
 function deleteCookie(cname) {
   setCookie(cname, "", 0)
-}
-
-var ignoreusers = getCookie("ignoreusers")
-function showTasksForAllUsers() {
-  setCookie("ignoreusers", true, 1)
-}
-function showTasksForCurrentUser() {
-  deleteCookie("ignoreusers")
-}
-function toggleIgnoreUsers() {
-  // console.log("toggleIgnoreUsers(): ignoreusers going from <" + ignoreusers + "> to <" + !ignoreusers + ">")
-  if (ignoreusers) {
-    showTasksForCurrentUser()
-  }
-  else {
-    showTasksForAllUsers()
-  }
-  ignoreusers = !ignoreusers
-  forceRefresh()
 }
 
 /*

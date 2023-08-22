@@ -11,5 +11,4 @@ services:
   app:
     working_dir: ${CONT_PIM_PATH}
     volumes:
-      - ${HOST_PIM_PATH}:${CONT_PIM_PATH}
-
+       - ${HOST_PIM_PATH}:${CONT_PIM_PATH}

@@ -23,12 +23,8 @@ type Route struct {
 
 type Routes []Route
 
-// this is for temporary use while i develop user functionality
-// to allow me to see tasks for all users at once
-var queryIgnoreUsers = []string{"ignoreusers", "{ignoreusers}"}
-
-// i reuse this alot so put it here (temporarily added ignore users for convenience while I support it)
-var queryTags = []string{"tags", "{tags}", "ignoreusers", "{ignoreusers}"}
+// i reuse this alot so put it here
+var queryTags = []string{"tags", "{tags}"}
 
 var routes = Routes{
     Route{
@@ -85,7 +81,7 @@ var routes = Routes{
         Name: "TaskGeneralFind",
         Method: "GET",
         Pattern: "/tasks/find",
-        Queries: append([]string{"fromDate", "{date}", "toDate", "{date}"}, queryIgnoreUsers...),
+        Queries: []string{"fromDate", "{date}", "toDate", "{date}"},
         HandlerFunc: TaskGeneralFind,
     }, 
     Route{
@@ -112,28 +108,24 @@ var routes = Routes{
         Name: "TaskReplace",
         Method: "PUT",
         Pattern: "/tasks/{taskId}",
-        Queries: queryIgnoreUsers,
         HandlerFunc: TaskReplace,
     },
     Route{
         Name: "TaskUpdate",
         Method: "PATCH",
         Pattern: "/tasks/{taskId}",
-        Queries: queryIgnoreUsers,
         HandlerFunc: TaskUpdate,
     },
     Route{
         Name: "TaskDelete",
         Method: "DELETE",
         Pattern: "/tasks/{taskId}",
-        Queries: queryIgnoreUsers,
         HandlerFunc: TaskDelete,
     },
     Route{
         Name: "TagIndex",
         Method: "GET",
         Pattern: "/tags",
-        Queries: queryIgnoreUsers,
         HandlerFunc: TagIndex,
     },
     Route{

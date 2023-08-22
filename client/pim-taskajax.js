@@ -110,13 +110,6 @@ function makeURL(cmd, tags = null) {
     // hrm - those tags better not already have a comma in them
     params = "?tags=" + tags.join(",");
   }
-
-  // temporary - always ignore users if requested
-  if (ignoreusers) {
-    params += (params.length > 0 ? "&" : "?")
-    params += "ignoreusers=true"
-  }
-
   return baseURL + cmd + params;
 }
 

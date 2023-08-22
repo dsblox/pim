@@ -19,7 +19,7 @@ COPY . .
 RUN go install
 
 # set up some aliases useful in our development environment
-RUN echo 'alias cd-pim="cd /app"' >> ~/.bashrc # this may be wrong
+RUN echo 'alias cd-pim="cd /pimdev"' >> ~/.bashrc # this may be wrong
 RUN echo 'alias run-pim="cd-pim;pim -server -db yaml"' >> ~/.bashrc
 RUN echo 'alias make-pim="cd-pim;go install"' >> ~/.bashrc
 

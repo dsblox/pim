@@ -21,15 +21,7 @@ func enableCors(w *http.ResponseWriter) {
 // TEMPORARY way to allow all tasks to be owned by one user while developing user behavior
 func UserIfOn(w http.ResponseWriter, r *http.Request) *User {
     // TEMPORARY while we develop to easily turn multiuser functionality on / off
-
-    // pull url parameter to ignore current user
-    vars := mux.Vars(r)
-    _, ignoreUsers := vars["ignoreusers"]
-
-    // if ignoring users don't get the user
-    if ignoreUsers {
-        return nil
-    }
+    // removed ignoreusers functionality when pushed to production August 2023
 
     // the usual case is this just wraps UserFromRequest
     return UserFromRequest(w, r)
@@ -51,6 +43,7 @@ type TaskJSON struct {
     SetTags []string `json:"setTags"`        // for updates only - which tags to set - set "wins"
     ResetTags []string `json:"resetTags"`    // for updates only - which tags to reset
 }
+
 
 
 func (j *TaskJSON) IsDirty(field string) bool {
@@ -389,7 +382,17 @@ func TaskFindThisWeek(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+/*
+===============================================================================
+ taskRead
+-------------------------------------------------------------------------------
+ Inputs: w http.ResponseWriter - where to write errors
+         r http.Request        - the request with the payload
+ Return:   *TaskJSON           - pointer to the task provided in the request
 
+ This helper function is used by endpoints that can expect JSON with a single
+ task.
+=============================================================================*/
 func taskRead(w http.ResponseWriter, r *http.Request) *TaskJSON {
 
     var task TaskJSON
@@ -400,17 +403,104 @@ func taskRead(w http.ResponseWriter, r *http.Request) *TaskJSON {
     if err := r.Body.Close(); err != nil {
         panic(err)
     }
-    // fmt.Printf("taskRead() payload received: %s\n", body)
-    if err := json.Unmarshal(body, &task); err != nil {
+
+    // make sure we have a valid JSON payload
+    if !json.Valid(body) {
         errorResponse(w, pimErr(badRequest))
-        fmt.Print("taskRead(): ")
-        fmt.Println(err)
         return nil
+    }
+
+    if err := json.Unmarshal(body, &task); err != nil {
+        // error here means something's wrong with the code
+        // not the JSON payload (given we checked for valid
+        // JSON above)
+        panic(err)
     }
 
     return &task
 }
 
+/*
+===============================================================================
+ tasksRead
+-------------------------------------------------------------------------------
+ Inputs: w http.ResponseWriter - where to write errors
+         r http.Request        - the request with the payload
+ Return:   []TaskJSON          - array of one (or more) tasks in request
+
+ This helper function is used by endpoints that can expect JSON with either
+ one task OR an array of tasks.  It always returns a slice of tasks to the
+ caller, though the slice may include only one task if only one was provided.
+=============================================================================*/
+func tasksRead(w http.ResponseWriter, r *http.Request) []TaskJSON {
+
+    var tasks []TaskJSON
+
+    // get raw data so we can check for an array before unmarshalling
+    var rawData json.RawMessage
+    if err := json.NewDecoder(r.Body).Decode(&rawData); err != nil {
+        errorResponse(w, pimErr(badRequest))
+        return nil
+    }
+    var isArray bool
+    if rawData[0] == '[' {
+        isArray = true
+    }
+
+    if isArray {
+        if err := json.Unmarshal(rawData, &tasks); err != nil {
+            errorResponse(w, pimErr(badRequest))
+            return nil
+        }
+        // fmt.Printf("Received an array of tasks: %+v\n", tasks)
+    } else {
+        var task TaskJSON
+        if err := json.Unmarshal(rawData, &task); err != nil {
+            errorResponse(w, pimErr(badRequest))
+            return nil
+        }
+        tasks = append(tasks, task)
+        // fmt.Printf("Received a single task: %+v\n", task)
+    }    
+
+    return tasks
+}
+
+
+// Used when responding to a bulk or batch API request such as creating multiple items
+type TaskStatusJSON struct {
+    Task   TaskJSON   `json:"task"`
+    Status string     `json:"status"`
+    Error  string     `json:"error,omitempty"`    
+}
+type BulkResponseJSON struct {
+    Status string           `json:"status"`
+    Items  []TaskStatusJSON `json:"items"`
+}
+
+
+/*
+===============================================================================
+ TaskCreate
+-------------------------------------------------------------------------------
+ Inputs: w http.ResponseWriter - where to write our response
+         r http.Request        - the request with the payload
+
+ Result: 201 (created)         - single task was created, or all tasks created
+         500 (server error)    - unable to save single task or any task
+         207 (multi-status)    - some tasks failed (check response for details)
+
+ Create one or more tasks.  The JSON provide can be for a single task or can
+ be an array of tasks.  The response will reflect the structure of the request
+ by returning either the new task (with its assigned id) or a list of such
+ tasks.
+
+ IN DEV: Today we still always create a single task, even if multiple are
+ provided.  TBD: loop over the tasks returned from tasksRead() to create each
+ and adjust the resulting JSON response to have the list returned to the
+ caller.  THIS CODE IS NOT YET TESTED FOR BULK CREATION!  It does work for
+ single task creation.
+=============================================================================*/
 func TaskCreate(w http.ResponseWriter, r *http.Request) {
 
     // find the user creating the task who will own it
@@ -418,33 +508,70 @@ func TaskCreate(w http.ResponseWriter, r *http.Request) {
     if user == nil { return }
     // we don't use UserIfOn() - can create new tasks with users even temporarily
 
-    // read the task from the request
-    taskJSON := taskRead(w, r)
-    if taskJSON == nil {
+    // read the task or tasks from the request - always get back a list
+    tasksJSON := tasksRead(w, r)
+    if tasksJSON == nil || len(tasksJSON) == 0 {
         return
     }
 
-    // create a persistable task in our world with a unique id
-    t := NewTask(taskJSON.Name)
-    t.AddUser(user)
-    taskJSON.ToTask(t, false)
-    master.AddChild(t)
-    // err := t.Save(true)
-    err := CommandCreateTask(t)
-    if (err != nil) {
-        fmt.Printf("TaskCreate: save failed with errror: %s\n", err)
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-        w.WriteHeader(http.StatusInternalServerError)
-    } else {
+    // the code prepares a response for multiple task creation but
+    // responds with only one if only one was requested. We track the
+    // last one so it is easy to respond with just one when needed
+    multiResponse := BulkResponseJSON{}
+    cntOK := 0
+    var lastTaskJSON TaskJSON
+    for _, taskJSON := range tasksJSON {
 
-        // set the successful response to include task
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-        w.WriteHeader(http.StatusCreated)
-        var j TaskJSON
-        j.FromTask(t)
-        if err := json.NewEncoder(w).Encode(j); err != nil {
-            panic(err)
-        }        
+        // create a persistable task in our world with a unique id
+        t := NewTask(taskJSON.Name)
+        t.AddUser(user)
+        taskJSON.ToTask(t, false)
+        master.AddChild(t)
+
+        // track taskStatus objects in case we have multiple items
+        taskStatus := TaskStatusJSON{}
+
+        // save the task with a cmd so it can be undone
+        // TBD: consider a bulk undo frame for a bulk create
+        err := CommandCreateTask(t)
+        if err != nil {
+            taskStatus.Task = TaskJSON{Name: t.GetName()}
+            taskStatus.Status = "Failed"
+            taskStatus.Error = "Unable to save task"
+        } else {
+            lastTaskJSON.FromTask(t)
+            taskStatus.Task = lastTaskJSON
+            taskStatus.Status = "Created"
+            cntOK++
+        }
+        multiResponse.Items = append(multiResponse.Items, taskStatus)
+    }
+
+    // set the headers based on the three possible status codes
+    w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+    switch {
+    case cntOK == len(tasksJSON):
+        multiResponse.Status = "OK"
+        w.WriteHeader(http.StatusCreated) // multi or single succcess
+    case cntOK == 0:
+        multiResponse.Status = "All Failed"
+        w.WriteHeader(http.StatusInternalServerError)
+    default:
+        multiResponse.Status = "Partial Success"
+        w.WriteHeader(http.StatusMultiStatus)
+    }
+
+    // one task add task directly, multi uses saved task statuses
+    if len(tasksJSON) == 1 {
+        if cntOK == 1 {
+            if err := json.NewEncoder(w).Encode(lastTaskJSON); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+            }
+        }
+    } else {
+        if err := json.NewEncoder(w).Encode(multiResponse); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+        }                                
     }
 }
 
