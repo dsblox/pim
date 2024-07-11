@@ -1044,11 +1044,13 @@ func (tm TaskDataMapperPostgreSQL) loadChildren(parent *Task, root bool) error {
     db_estimate_minutes sql.NullInt64
   )
 
+  // note that we are limiting to 1000 records - we need a smarter lazy loading technique here
   var baseQuery string = `SELECT t.id, t.name, t.state, t.target_start_time, t.actual_start_time, t.actual_completion_time, t.estimate_minutes
                           FROM tasks t
                         LEFT JOIN task_parents tp ON tp.child_id = t.id
                         WHERE tp.parent_id %s
-                        GROUP BY t.id`
+                        GROUP BY t.id
+                        ORDER BY t.actual_completion_time DESC LIMIT 1000`
 
     // if no parent on this guy then we're at the top - load root tasks
     var sqlSelect string
