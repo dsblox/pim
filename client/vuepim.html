@@ -89,12 +89,12 @@
       <pim-column :show="rightShow" > 
         <div class="row">
             <div class="col-sm-12">
-              <pim-task-list :task-list="all" :title="titleLists[3]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" :showtags = "['Urgent']" />
+              <pim-task-list :task-list="all" :title="titleLists[3]" :state="2" @modal="modal" :tags="selectedTags" systag="today" hidewhenempty @numtasks="numtasks" :showtags = "['Urgent', 'Important']" />
             </div>
         </div>
         <div class="row">
           <div class="col-sm-12">
-            <pim-task-list :task-list="all" :title="titleLists[4]" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" :copy="true" hidewhenempty @numtasks="numtasks" :showtags = "['Urgent']" />
+            <pim-task-list :task-list="all" :title="titleLists[4]" :state="1" clear="today" @drop="drop" @modal="modal" :tags="selectedTags" systag="today" :copy="true" hidewhenempty @numtasks="numtasks" :showtags = "['Urgent', 'Important']" />
           </div>
         </div>
       </pim-column>
