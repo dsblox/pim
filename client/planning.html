@@ -79,7 +79,7 @@
         </div>
         <div class="row mx-0">
           <div class="col pl-0 pr-1">
-            <pim-task-list :task-list="all" title="Don't Forget" :state="0" :add="true" :week="true" clear="dontforget" :copy="true" @modal="modal" systag="dontforget" :tags="selectedTags" toggletag="today" />
+            <pim-task-list :task-list="all" title="Don't Forget" :state="0" :add="true" :week="true" clear="dontforget" :copy="true" @modal="modal" systag="dontforget" :tags="selectedTags" toggletag="today"  :showtags="['Urgent', 'Important']" />
           </div>
         </div>
         <div class="row mx-0">
@@ -91,7 +91,7 @@
 
 
       <div class="col pl-1 pr-0">
-        <pim-task-list :task-list="all" title="Daily Goals" :add="true" toggletag="today" @modal="modal" systag="today" :tags="selectedTags" sort="state" />
+        <pim-task-list :task-list="all" title="Daily Goals" :add="true" toggletag="today" @modal="modal" systag="today" :tags="selectedTags" sort="state" :showtags="['Urgent', 'Important']" />
       </div>
 
     </div>
